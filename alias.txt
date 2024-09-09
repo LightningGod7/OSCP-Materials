@@ -1,0 +1,7 @@
+alias update='sudo -- sh -c "apt update && apt upgrade"'
+alias bo='cat /pt/reference/breakout'
+alias me="ip -o -4 addr list tun0 | awk '{print \$4}' | cut -d/ -f1"
+alias rrev='rlwrap nc -nvlp'
+alias rev="head -n 3 /pt/reference/breakout ; nc -nvlp"
+alias serv='python3 -m http.server'
+alias sserv='impacket-smbserver kali . -smb2support'
