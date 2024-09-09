@@ -8,4 +8,4 @@ ref.py - quickly print out basics.txt with dynamic IP address insertion for comm
 
 rs.py - simple reverse shell generator
     
-How-to-use guide at https://lightninggod7.github.io/modus-operandi.md
+How-to-use guide at [https://lightninggod7.github.io/modus-operandi.md](https://lightninggod7.github.io/modus-operandi.html)
