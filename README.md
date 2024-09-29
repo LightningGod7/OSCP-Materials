@@ -4,8 +4,11 @@ basics.txt - cheat sheet to quickly search commands for copy paste
 
 breakout.txt - to stablise, upgrade shells
 
-ref.py - quickly print out basics.txt with dynamic IP address insertion for commands requiring a listener address or port.
+ref - quickly print out basics.txt with dynamic IP address insertion for commands requiring a listener address or port.
 
-rs.py - simple reverse shell generator
+rs - simple reverse shell generator
     
 How-to-use guide at [https://lightninggod7.github.io/modus-operandi.md](https://lightninggod7.github.io/modus-operandi.html)
+
+
+Run initialize.sh in your vm to replicate files
