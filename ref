@@ -3,7 +3,7 @@ import sys
 import netifaces as ni
 
 
-CHEATSHEET_PATH = '/pt/references/cheatsheet'
+CHEATSHEET_PATH = '/pt/reference/cheatsheet'
 
 def get_tun0_ip():
     try:
