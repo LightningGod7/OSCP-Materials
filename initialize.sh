@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# Step 1: Clone the repository
-echo "Cloning the OSCP Materials repository..."
-git clone https://github.com/LightningGod7/OSCP-Materials.git /tmp/oscp-materials
 
 # Step 2: Move files to the desired directories
 echo "Moving files to /opt and setting permissions..."
