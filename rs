@@ -2,10 +2,9 @@
 
 import sys
 import base64
-import netifaces as ni
 
 def usage():
-    print("Usage: {} [-t <shell_type>] [-i <INTERFACE>] [-p <LPORT>]".format(sys.argv[0]))
+    print("Usage: {} [-t <shell_type>] [-i <LHOST>] [-p <LPORT>]".format(sys.argv[0]))
     sys.exit(1)
 
 def generate_bash(LHOST, LPORT):
@@ -88,7 +87,6 @@ if __name__ == "__main__":
     LHOST = None
     LPORT = 80
     shell_type = "all"
-    interface = None
 
     # Parse the command-line arguments
     i = 1
@@ -97,7 +95,7 @@ if __name__ == "__main__":
             shell_type = sys.argv[i + 1]
             i += 2
         elif sys.argv[i] == '-i':
-            interface = sys.argv[i + 1]
+            LHOST = sys.argv[i + 1]  # Directly set the LHOST
             i += 2
         elif sys.argv[i] == '-p':
             LPORT = int(sys.argv[i + 1])
@@ -105,24 +103,10 @@ if __name__ == "__main__":
         else:
             usage()
 
-    # Determine the LHOST based on the interface
-    if interface:
-        if interface in ni.interfaces():
-            LHOST = ni.ifaddresses(interface)[ni.AF_INET][0]['addr']
-            print(f"Using IP address {LHOST} from interface {interface}")
-        else:
-            print(f"Interface '{interface}' does not exist.")
-            sys.exit(1)
-    else:
-        if 'tun0' in ni.interfaces():
-            LHOST = ni.ifaddresses('tun0')[ni.AF_INET][0]['addr']
-            print(f"Using IP address {LHOST} from interface tun0")
-        elif 'eth0' in ni.interfaces():
-            LHOST = ni.ifaddresses('eth0')[ni.AF_INET][0]['addr']
-            print(f"Using IP address {LHOST} from interface eth0")
-        else:
-            print("No valid interface found (tun0 or eth0). Please specify an interface using the -i flag.")
-            sys.exit(1)
+    # Ensure LHOST is provided
+    if not LHOST:
+        print("Error: LHOST must be specified using the -i flag.")
+        sys.exit(1)
 
     # Generate and print payloads based on the given parameters
     payload = generate_payloads(LHOST, LPORT, shell_type)
