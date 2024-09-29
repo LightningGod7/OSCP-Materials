@@ -2,15 +2,26 @@
 import sys
 import netifaces as ni
 
-
 CHEATSHEET_PATH = '/pt/reference/cheatsheet'
 
-def get_tun0_ip():
+def get_ip_address(interface):
     try:
-        TUN0_IP = ni.ifaddresses('tun0')[ni.AF_INET][0]['addr']
-        return TUN0_IP
-    except ValueError:
+        ip_address = ni.ifaddresses(interface)[ni.AF_INET][0]['addr']
+        return ip_address
+    except (ValueError, KeyError):
         return None
+
+def get_tun0_or_eth0_ip():
+    tun0_ip = get_ip_address('tun0')
+    if tun0_ip:
+        return tun0_ip
+    else:
+        print("No tun0 IP found, checking for eth0 IP...")
+        eth0_ip = get_ip_address('eth0')
+        if eth0_ip:
+            return eth0_ip
+        else:
+            return None
 
 def read_file(file_path):
     with open(file_path, 'r') as file:
@@ -26,31 +37,37 @@ def search_keyword(lines, keyword, lines_after=0):
             for j in range(1, lines_after + 1):
                 if i + j < len(lines):
                     print(lines[i + j].strip())
-            if lines_after!=0:
+            if lines_after != 0:
                 break
     if not found:
         print(f"Keyword '{keyword}' not found in the file.")
 
 if __name__ == "__main__":
-    if len(sys.argv) == 1:
+    ip_address = None
+
+    # Check for -i argument
+    if len(sys.argv) > 2 and sys.argv[1] == '-i':
+        ip_address = sys.argv[2]
+        lines = read_file(CHEATSHEET_PATH)
+    elif len(sys.argv) == 1:
         # If no arguments provided, simply output the whole file
         lines = read_file(CHEATSHEET_PATH)
-        tun0_ip = get_tun0_ip()
-        if tun0_ip:
-            for line in lines:
-                print(line.replace('$LHOST', tun0_ip).strip())
-        else:
-            print("Please connect to VPN to get the tun0 IP address.")
-            for line in lines:
-                print(line.strip())
+        ip_address = get_tun0_or_eth0_ip()
     else:
         keyword = sys.argv[1]
         lines_after = int(sys.argv[2]) if len(sys.argv) > 2 else 0
-        tun0_ip = get_tun0_ip()
-        lines = read_file('/pt/reference/basics')
-        if tun0_ip:
-            lines = [line.replace('$LHOST', tun0_ip) for line in lines]
+        ip_address = get_tun0_or_eth0_ip()
+        lines = read_file(CHEATSHEET_PATH)
+
+    if ip_address:
+        lines = [line.replace('$LHOST', ip_address) for line in lines]
+        if len(sys.argv) > 2 and sys.argv[1] == '-i':
+            # No keyword search if -i is used
+            for line in lines:
+                print(line.strip())
+        elif len(sys.argv) > 1:
+            keyword = sys.argv[1]
+            lines_after = int(sys.argv[2]) if len(sys.argv) > 2 else 0
             search_keyword(lines, keyword, lines_after)
-        else:
-            print("Please connect to VPN to get the tun0 IP address.")
-            search_keyword(lines, keyword, lines_after)
+    else:
+        print("Please connect to VPN or ensure eth0 is active to get the IP address.")
