@@ -12,4 +12,4 @@ How-to-use guide at [https://lightninggod7.github.io/modus-operandi.md](https://
 
 
 Run initialize.sh in your vm to replicate files
-Run zeus-apps.sh to install the apps i recommend
+Run install-apps.sh to install the apps i recommend (for fresh kali)
