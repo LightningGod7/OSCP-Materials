@@ -105,7 +105,7 @@ if __name__ == "__main__":
 
     # Ensure LHOST is provided
     if not LHOST:
-        print("Error: LHOST must be specified using the -i flag.")
+        print("Error: No tun0 interface detected, LHOST must be specified using the -i flag.\n e.g. rs -i 192.168.7.1 or rs -i ens18")
         sys.exit(1)
 
     # Generate and print payloads based on the given parameters
