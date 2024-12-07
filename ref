@@ -2,7 +2,7 @@
 import sys
 import netifaces as ni
 
-CHEATSHEET_PATH = '/pt/reference/cheatsheet'
+CHEATSHEET_PATH = '/pt/references/cheatsheet'
 
 def get_ip_address(interface):
     try:
