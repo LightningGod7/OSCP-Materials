@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/zsh
 
 
 # Step 2: Move files to the desired directories
