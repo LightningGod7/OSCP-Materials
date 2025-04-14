@@ -48,3 +48,7 @@ for pkg in diodon terminator ligolo rlwrap freerdp2-x11 npm rustscan; do
 done
 
 echo "All installations complete!"
+
+echo "starting apache service"
+sudo systemctl start apache2
+sudo systemctl enable apache2
