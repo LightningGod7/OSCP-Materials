@@ -38,4 +38,8 @@ fi
 echo "Sourcing ~/.zshrc to apply changes..."
 source ~/.zshrc
 
+
+#Step 9: Create symlinks
+sudo ln -s /usr/share/wordlists /wls
+sudo ln -s /var/www/html /serve
 echo "Script completed successfully."
