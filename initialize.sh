@@ -19,12 +19,12 @@ fi
 
 # Step 5: Create directories for reference materials
 echo "Creating /pt and /pt/reference directories..."
-sudo mkdir -p /pt/reference
+sudo mkdir -p /pt/references
 
 # Step 6: Move reference files to the reference directory
 echo "Moving cheatsheet and upshell to /pt/reference..."
-sudo mv /tmp/oscp-materials/cheatsheet /pt/reference/cheatsheet
-sudo mv /tmp/oscp-materials/upshell /pt/reference/upshell
+sudo mv /tmp/oscp-materials/cheatsheet /pt/references/cheatsheet
+sudo mv /tmp/oscp-materials/upshell /pt/references/upshell
 
 # Step 7: Append the contents of alias.txt to ~/.zshrc
 echo "Appending aliases to ~/.zshrc..."
