@@ -4,29 +4,12 @@
 echo "Updating package list..."
 sudo apt update
 
-# Install diodon
-echo "Installing diodon..."
-sudo apt install -y diodon
+# Install apps
+echo "Installing apps..."
+sudo apt install -y diodon donut terminator rlwrap freerdp2-x11 libkrb5-dev bloodyAD npm ligolo-ng
 
-# Install terminator
-echo "Installing terminator..."
-sudo apt install -y terminator
-
-# Install ligolo
-echo "Installing ligolo..."
-sudo apt install -y ligolo
-
-# Install rlwrap
-echo "Installing rlwrap..."
-sudo apt install -y rlwrap
-
-# Install xfreerdp
-echo "Installing xfreerdp..."
-sudo apt install -y freerdp2-x11
-
-#Install npm
-echo "Installing npm"
-sudo apt install npm -y
+# Install linux-powerview
+pipx install "git+https://github.com/aniqfakhrul/powerview.py"
 
 #Install rustscan
 echo "Installing rustscan"
