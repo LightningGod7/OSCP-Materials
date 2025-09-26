@@ -5,3 +5,9 @@ alias rrev='rlwrap nc -nvlp'
 alias rev="head -n 3 /pt/reference/upshell ; nc -nvlp"
 alias serv='python3 -m http.server'
 alias sserv='impacket-smbserver kali . -smb2support'
+alias sz='du -B1 --max-depth=1 | awk '\''{printf "%.2f GB\t%s\n", $1/1073741824, $2}'\'' | sort -nr'
+alias srvpull="sudo find /pt/RedTeamPayloads \( -path \"*/bin/*\" -o -path \"*/Release/*\" \) -not \( -path \"*/obj/*\" -o -path \"*/Debug/*\" \) \>
+alias clip="tee >(xsel -ib)"
+unset zle_bracketed_paste
+autoload -Uz bracketed-paste-magic && zle -N bracketed-paste bracketed-paste-magic
+unset zle_bracketed_paste
