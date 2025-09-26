@@ -11,6 +11,9 @@ sudo apt install -y diodon donut terminator rlwrap freerdp2-x11 libkrb5-dev bloo
 # Install linux-powerview
 pipx install "git+https://github.com/aniqfakhrul/powerview.py"
 
+# Install NetExec
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+sudo apt install pipx git; pipx install git+https://github.com/Pennyw0rth/NetExec; pipx ensurepath; source ~/.zshrc
 #Install rustscan
 echo "Installing rustscan"
 sudo wget https://github.com/RustScan/RustScan/releases/download/2.3.0/rustscan-2.3.0-x86_64-linux.zip -O /home/kali/Downloads/rustscan-2.3.0-x86_64-linux.zip
