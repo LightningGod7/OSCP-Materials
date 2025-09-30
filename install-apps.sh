@@ -6,7 +6,7 @@ sudo apt update
 
 # Install apps
 echo "Installing apps..."
-sudo apt install -y diodon donut terminator rlwrap freerdp2-x11 libkrb5-dev bloodyAD npm ligolo-ng
+sudo apt install -y diodon donut terminator rlwrap freerdp2-x11 libkrb5-dev bloodyAD npm ligolo-ng mssqland
 
 # Install linux-powerview
 pipx install "git+https://github.com/aniqfakhrul/powerview.py"
